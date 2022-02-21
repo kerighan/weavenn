@@ -11,7 +11,7 @@ from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, 20newsgroups
 # v   ,       , v  , v   , v    , v    ,
-dataset = "iris"
+dataset = "seeds"
 X, y = load(dataset)
 
 sheets = oo.Sheets("13N_pbxrKk-C-Pr-xVnyPVbmhu_KzYYsWcm0gJqDMb5Y")
@@ -20,7 +20,7 @@ sheets = oo.Sheets("13N_pbxrKk-C-Pr-xVnyPVbmhu_KzYYsWcm0gJqDMb5Y")
 def optimize_knnl():
     from weavenn.weavenn import predict_knnl
 
-    ks = range(20, 200, 10)
+    ks = range(20, 160, 10)
     data = []
     for k in tqdm(ks):
         tmp = {"k": k}
