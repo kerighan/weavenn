@@ -1,12 +1,15 @@
 import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
 from hdbscan import HDBSCAN
 from sklearn.datasets import make_blobs
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
                              completeness_score, homogeneity_score)
 from weavenn import WeaveNN
 
-X, y = make_blobs(n_samples=500)
+N = np.random.randint(100, 1000)
+X, y = make_blobs(n_samples=N)
+print(f"N={N}")
 
 y_hdbscan = HDBSCAN().fit_predict(X)
 
@@ -22,7 +25,8 @@ print(f"rand_score      = {rand_score:.3f}")
 print(f"mutual_info     = {mutual_info_score:.3f}")
 
 # create model and build graph
-weave = WeaveNN(k_max=200)  # use larger k_max for larger clusters
+# use larger k_max for larger clusters
+weave = WeaveNN(k=200, clustering_algorithm="louvain")
 G = weave.fit_transform(X)
 # get cluster labels from graph
 y_weave = weave.predict(G)

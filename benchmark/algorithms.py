@@ -1,8 +1,6 @@
-from weavenn import WeaveNN
 from hdbscan import HDBSCAN
-from DBSCANPP import DBSCANPP
 from sklearn.cluster import DBSCAN, OPTICS, AffinityPropagation
-
+from weavenn import WeaveNN
 
 algorithms = [
     "weavenn", "knn-L", "OPTICS", "DBSCAN", "HDBSCAN", "AffinityPropagation"
@@ -24,8 +22,6 @@ def predict(name, X):
         return predict_dbscanpp(X)
     elif name == "HDBSCAN":
         return predict_hdbscan(X)
-    elif name == "ROCK":
-        return predict_rock(X)
 
 
 def predict_affinity(X):
@@ -33,7 +29,7 @@ def predict_affinity(X):
 
 
 def predict_weavenn(X):
-    return WeaveNN(verbose=True).fit_predict(X)
+    return WeaveNN(verbose=False, k=70).fit_predict(X)
 
 
 def predict_hdbscan(X):
@@ -50,6 +46,7 @@ def predict_optics(X):
 
 
 def predict_dbscanpp(X):
+    from DBSCANPP import DBSCANPP
     try:
         return DBSCANPP(
             p=0.1, eps_density=5.0,
@@ -60,21 +57,5 @@ def predict_dbscanpp(X):
 
 
 def predict_knnl(X):
-    from weavenn.ann import get_hnswlib_nns_function
-    from weavenn.weavenn import get_louvain_communities
-    import networkx as nx
-
-    get_nns = get_hnswlib_nns_function("l2")
-    labels, dists = get_nns(X, k=40)
-    
-    edges = set()
-    for i, row in enumerate(labels):
-        for j in row:
-            if i == j:
-                continue
-            pair = (i, j) if i < j else (j, i)
-            edges.add((i, j))
-    G = nx.Graph()
-    G.add_nodes_from(range(len(X)))
-    G.add_edges_from(edges)
-    return get_louvain_communities(G)
+    from weavenn.weavenn import predict_knnl as pknnl
+    return pknnl(X, k=30)

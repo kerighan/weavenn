@@ -1,12 +1,11 @@
-from sklearn.datasets import load_wine, load_iris, fetch_openml, fetch_rcv1
-from sklearn.preprocessing import robust_scale, LabelEncoder, minmax_scale
-from sklearn.datasets import fetch_20newsgroups
+import numpy as np
+import pandas as pd
+from sklearn.datasets import (fetch_20newsgroups, fetch_openml, fetch_rcv1,
+                              load_iris, load_wine)
+from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
-from sklearn.decomposition import TruncatedSVD
-import pandas as pd
-import numpy as np
-
+from sklearn.preprocessing import LabelEncoder, minmax_scale, robust_scale
 
 # =============================================================================
 # Classification datasets
@@ -14,7 +13,7 @@ import numpy as np
 
 
 classification_datasets = [
-    "iris", "wine", "mobile", "zoo", "seeds", "heart",
+    "iris", "wine", "mobile", "glass", "zoo", "seeds",
     "20newsgroups", "stellar", "mnist", "fashion"
 ]
 
@@ -28,6 +27,8 @@ def load(name):
         return res.data, res.target
     elif name == "mobile":
         return load_mobile()
+    elif name == "glass":
+        return load_glass()
     elif name == "zoo":
         return load_zoo()
     elif name == "seeds":
@@ -42,17 +43,8 @@ def load(name):
         return load_20newsgroups()
     elif name == "reuters":
         return load_reuters()
-    elif name == "heart":
-        return load_heart()
     elif name == "mall":
         return load_mall()
-
-
-def load_heart():
-    df = pd.read_csv("datasets/heart.csv")
-    X = robust_scale(df.iloc[:, :-1].values)
-    y = df["target"].values
-    return X, y
 
 
 def load_zoo():
@@ -82,22 +74,29 @@ def load_mobile():
     return X, y
 
 
+def load_glass():
+    df = pd.read_csv("datasets/glass.csv")
+    y = df["Type"].values
+    X = df.iloc[:, :-1].values
+    return X, y
+
+
 def load_mnist():
-    from sklearn.decomposition import PCA
     mnist = fetch_openml("mnist_784", version=1)
     X = mnist.data
     y = mnist.target.astype(int)
     X = PCA(n_components=20).fit_transform(X)
+
     return X, y
 
 
 def load_fashion():
-    from sklearn.decomposition import PCA
     from keras.datasets import fashion_mnist
     (X, y), _ = fashion_mnist.load_data()
     X = X.astype(float) / 255.
     X = X.reshape((X.shape[0], X.shape[1] * X.shape[2]))
     X = PCA(n_components=20).fit_transform(X)
+
     return X, y
 
 
@@ -110,16 +109,12 @@ def load_cifar10():
 
 
 def load_stellar():
-    # index = np.arange(0, 100000)
-    # np.random.shuffle(index)
-    # print(index)
-    # index = index[:30000]
-
     df = pd.read_csv("datasets/star_classification.csv")
     le = LabelEncoder()
     y = le.fit_transform(df["class"])
     del df["class"]
     X = robust_scale(df.values)
+
     return X, y
 
 
@@ -128,7 +123,7 @@ def load_20newsgroups():
 
     pipe = Pipeline([
         ("vectorizer", TfidfVectorizer(max_features=100000)),
-        ("reducer", TruncatedSVD(n_components=200))
+        ("reducer", TruncatedSVD(n_components=50))
     ])
     X = pipe.fit_transform(newsgroups_train.data)
     y = newsgroups_train.target
@@ -156,11 +151,11 @@ def load_mall():
 def load_reuters():
     data = fetch_rcv1()
     pipe = Pipeline([
-        ("reducer", TruncatedSVD(n_components=200))
+        ("reducer", TruncatedSVD(n_components=50))
     ])
-    X = pipe.fit_transform(data.data[:50000])
+    X = pipe.fit_transform(data.data[:10000])
     return X
 
 
 if __name__ == "__main__":
-    print(load_reuters())
+    print(load_glass())
