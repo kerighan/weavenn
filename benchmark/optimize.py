@@ -9,7 +9,7 @@ from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, 20newsgroups, fashion, letters, phones
 # x     x       v    v     v      v
-dataset = "seeds"
+dataset = "iris"
 X, y = load(dataset)
 
 sheets = oo.Sheets("13N_pbxrKk-C-Pr-xVnyPVbmhu_KzYYsWcm0gJqDMb5Y")
@@ -58,8 +58,6 @@ def optimize_weavenn():
             {"k": k, "AMI": score_1, "rand": score_2})
 
     scores = pd.DataFrame(scores)
-    # scores = sorted(scores, key=lambda x: 0.5 *
-    #                 x[1][0]+0.5*x[1][1], reverse=True)
     sheets[f"weavenn_{dataset}"] = scores
 
 
@@ -79,8 +77,6 @@ def optimize_hdbscan():
                 {"mcs": mcs, "ms": ms, "AMI": score_1, "rand": score_2})
 
     scores = pd.DataFrame(scores)
-    # scores = sorted(scores, key=lambda x: 0.5 *
-    #                 x[1][0]+0.5*x[1][1], reverse=True)
     sheets[f"hdbscan_{dataset}"] = scores
 
 
