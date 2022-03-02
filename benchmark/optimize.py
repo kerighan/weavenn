@@ -1,16 +1,14 @@
-from pprint import pprint
+import time
 
-import knnl
-import numpy as np
 import oodles as oo
 import pandas as pd
 from tqdm import tqdm
-from weavenn.weavenn import score
+from weavenn.weavenn import WeaveNN, predict_knnl, score
 
 from datasets import load
 
-# iris, mobile, zoo, wine, glass, seeds, 20newsgroups
-# v   ,       , v  , v   , v    , v    ,
+# iris, mobile, zoo, wine, glass, seeds, 20newsgroups, fashion, letters, phones
+# x     x       v    v     v      v
 dataset = "seeds"
 X, y = load(dataset)
 
@@ -18,68 +16,75 @@ sheets = oo.Sheets("13N_pbxrKk-C-Pr-xVnyPVbmhu_KzYYsWcm0gJqDMb5Y")
 
 
 def optimize_knnl():
-    from weavenn.weavenn import predict_knnl
 
     ks = range(20, 160, 10)
     data = []
+    start = time.time()
     for k in tqdm(ks):
         tmp = {"k": k}
-        y_pred = knnl.predict(X, k)
-        score_1, score_2 = score(y, y_pred)
-        tmp["knn"] = (score_2 + score_1) / 2
-        y_pred = knnl.predict_2(X, k)
-        score_1, score_2 = score(y, y_pred)
-        tmp["weavenn"] = (score_2 + score_1) / 2
-        y_pred = knnl.predict_5(X, k)
-        score_1, score_2 = score(y, y_pred)
-        tmp["test"] = (score_2 + score_1) / 2
+        y_pred = predict_knnl(X, k)
+        score_1, _ = score(y, y_pred)
+        tmp["knnl_AMI"] = score_1
+
+        y_pred = WeaveNN(k=k, min_sim=0.01).fit_predict(X)
+        score_1, _ = score(y, y_pred)
+        tmp["weavenn_AMI"] = score_1
+        print(tmp)
+
         data.append(tmp)
-    data = pd.DataFrame(data)[["k", "knn", "weavenn", "test"]]
-    print(data["knn"].mean())
-    print(data["weavenn"].mean())
-    print(data["test"].mean())
+    print(time.time() - start)
+    data = pd.DataFrame(data)[
+        ["k", "knnl_AMI", "weavenn_AMI"]]
+
+    print(data["knnl_AMI"].mean(), data["knnl_AMI"].std())
+    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
+
     print()
-    print(data["knn"].max())
-    print(data["weavenn"].max())
-    print(data["test"].max())
-    sheets[dataset] = data
-
-    # k = 50
-    # y_pred = knnl.predict(X, k)
-    # score_1, score_2 = score(y, y_pred)
-    # print(score_1, score_2)
-
-    # y_pred = knnl.predict_5(X, 100)
-    # score_1, score_2 = score(y, y_pred)
-    # print(score_1, score_2)
+    print(data["knnl_AMI"].max())
+    print(data["weavenn_AMI"].max())
+    sheets[f"{dataset}_test"] = data
 
 
 def optimize_weavenn():
     from weavenn import WeaveNN
 
-    ks = [80, 90, 100, 110]
-    ks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-    min_sims = np.linspace(1e-3, .5, 5)
-
+    ks = range(20, 160, 10)
     scores = []
     for k in tqdm(ks):
-        # k += 50
-        # weave = WeaveNN(k_max=k, min_sim=.001, threshold=.1)
-        # y_pred = weave.fit_predict(X)
-        # score_1, score_2 = score(y, y_pred)
-        # scores.append(({"k": k, "min_sim": 0.001}, (score_1, score_2)))
+        weave = WeaveNN(k=k)
+        y_pred = weave.fit_predict(X)
+        score_1, score_2 = score(y, y_pred)
+        scores.append(
+            {"k": k, "AMI": score_1, "rand": score_2})
 
-        for sim in min_sims:
-            weave = WeaveNN(k_max=k, min_sim=sim, threshold=.0)
-            y_pred = weave.fit_predict(X)
+    scores = pd.DataFrame(scores)
+    # scores = sorted(scores, key=lambda x: 0.5 *
+    #                 x[1][0]+0.5*x[1][1], reverse=True)
+    sheets[f"weavenn_{dataset}"] = scores
+
+
+def optimize_hdbscan():
+    from hdbscan import HDBSCAN
+
+    # ks = range(20, 160, 10)
+    min_cluster_size = range(5, 25, 5)
+    min_samples = range(1, 20)
+    scores = []
+    for mcs in tqdm(min_cluster_size):
+        for ms in min_samples:
+            clusterer = HDBSCAN(min_cluster_size=mcs, min_samples=ms)
+            y_pred = clusterer.fit_predict(X)
             score_1, score_2 = score(y, y_pred)
-            scores.append(({"k": k, "min_sim": sim}, (score_1, score_2)))
+            scores.append(
+                {"mcs": mcs, "ms": ms, "AMI": score_1, "rand": score_2})
 
-    scores = sorted(scores, key=lambda x: 0.5 *
-                    x[1][0]+0.5*x[1][1], reverse=True)
-    pprint(scores[:5])
+    scores = pd.DataFrame(scores)
+    # scores = sorted(scores, key=lambda x: 0.5 *
+    #                 x[1][0]+0.5*x[1][1], reverse=True)
+    sheets[f"hdbscan_{dataset}"] = scores
 
 
 if __name__ == "__main__":
+    # optimize_hdbscan()
     # optimize_weavenn()
     optimize_knnl()

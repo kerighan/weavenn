@@ -11,26 +11,30 @@ class WeaveNN:
         self,
         k=100,
         ann_algorithm="hnswlib",
-        clustering_algorithm="louvain",
+        method="louvain",
+        prune=False,
         metric="l2",
+        min_sim=.01,
         verbose=False
     ):
         self.k = k
         self._get_nns = get_ann_algorithm(ann_algorithm, metric)
-        self._clustering = get_clustering_algorithm(clustering_algorithm)
+        if method == "louvain":
+            self._clustering = cluster_louvain
+        else:
+            self._clustering = cluster_louvain_opti
+        self.prune = prune
+        self.min_sim = min_sim
         self.verbose = verbose
 
-    def fit_predict(self, X, resolution=1., random_state=123):
+    def fit_predict(self, X, resolution=1.):
         G = self.fit_transform(X)
         return self.predict(
-            G,
-            resolution=resolution,
-            random_state=random_state)
+            G, X,
+            resolution=resolution)
 
-    def predict(self, G, resolution=1., random_state=123):
-        res = self._clustering(G,
-                               resolution=resolution,
-                               random_state=random_state)
+    def predict(self, G, X=None, resolution=1.):
+        res = self._clustering(G, X=X, prune=self.prune)
         return res
 
     def fit_transform(self, X):
@@ -39,12 +43,19 @@ class WeaveNN:
         return G
 
     def _build_graph(self, labels, distances):
-        candidates = {}
+        candidates = set()
         local_scaling = distances[:, -1]
-        for i, (neighbors, dists) in enumerate(zip(labels, distances)):
-            nns_i = set(neighbors)
+        edges = []
+        for i, (neighbors, dists, node_scaling) in enumerate(
+                zip(labels, distances, local_scaling)):
 
-            dists = (dists**2)/local_scaling[i]
+            # get node scalings
+            node_scaling = node_scaling.clip(1e-6, None)
+            neighbor_scaling = local_scaling[neighbors].clip(1e-6, None)
+            # normalize distances
+            dists = dists**2/(node_scaling * neighbor_scaling)
+
+            nns_i = set(neighbors)
             for index, j in enumerate(neighbors):
                 if i == j:
                     continue
@@ -53,15 +64,13 @@ class WeaveNN:
                     continue
 
                 nns_j = set(labels[j])
-                nn_count = np.log(len(nns_i.intersection(nns_j)) + 1)
-                candidates[pair] = 1 - np.tanh(
-                    dists[index] * nn_count / local_scaling[j])
+                nn_count = len(nns_i.intersection(nns_j)) + 1
 
-        edges = []
-        for (i, j), weight in candidates.items():
-            if weight <= 0.0:
-                continue
-            edges.append((i, j, weight))
+                candidates.add(pair)
+                weight = 1 - np.tanh(dists[index]*np.log(nn_count))
+                if weight < self.min_sim:
+                    continue
+                edges.append((i, j, weight))
 
         # create graph
         G = nx.Graph()
@@ -74,61 +83,18 @@ class WeaveNN:
 # Clustering functions
 # =============================================================================
 
-
-def get_clustering_algorithm(algorithm):
-    if algorithm == "louvain":
-        return get_louvain_communities
-    elif algorithm == "combo":
-        return get_pycombo_communities
-    elif algorithm == "lpa":
-        return get_lpa_communities
+def cluster_louvain_opti(G, X=None, prune=False, resolution=1):
+    from louvaincpp import metric_louvain
+    return metric_louvain(G, X=X, resolution=resolution, prune=prune)
 
 
-def get_louvain_communities(G, resolution=1., random_state=123, **kwargs):
-    n = len(G.nodes)
-    try:
-        from cylouvain import best_partition
-        if nx.is_weighted(G):
-            A = nx.adjacency_matrix(G).astype(float)
-            node_to_com = best_partition(
-                A, resolution=resolution)
-        else:
-            node_to_com = best_partition(
-                G, resolution=resolution)
-
-    except ImportError:
-        from community import best_partition
-
-        node_to_com = best_partition(
-            G, resolution=resolution, random_state=random_state)
-    coms = np.zeros(n, dtype=int)
-    for node, com in node_to_com.items():
-        coms[node] = com
-    return coms
-
-
-def get_lpa_communities(G, **kwargs):
-    from networkx.algorithms.community.label_propagation import \
-        asyn_lpa_communities
-
-    n = len(G.nodes)
-    node_to_com = list(asyn_lpa_communities(G, weight="weight"))
-    coms = np.zeros(n, dtype=int)
-    for i, nodes in enumerate(node_to_com):
-        for node in nodes:
-            coms[node] = i
-    return coms
-
-
-def get_pycombo_communities(G, **kwargs):
-    import pycombo
-
-    n = len(G.nodes)
-    node_to_com, _ = pycombo.execute(G)
-    coms = np.zeros(n, dtype=int)
-    for node, com in node_to_com.items():
-        coms[node] = com
-    return coms
+def cluster_louvain(G, X=None, prune=False, resolution=1):
+    from louvaincpp import louvain
+    partition = louvain(G, resolution=resolution, prune=prune)
+    y = np.zeros(len(G.nodes))
+    for i, v in partition.items():
+        y[i] = v
+    return y
 
 
 # =============================================================================
@@ -138,7 +104,7 @@ def get_pycombo_communities(G, **kwargs):
 
 def predict_knnl(X, k=100):
     ann = get_ann_algorithm("hnswlib", "l2")
-    clusterer = get_clustering_algorithm("louvain")
+    clusterer = cluster_louvain
 
     labels, _ = ann(X, k)
     edges = set()
@@ -150,6 +116,7 @@ def predict_knnl(X, k=100):
             edges.add(pair)
 
     G = nx.Graph()
+    G.add_nodes_from(range(len(X)))
     G.add_edges_from(edges)
     return clusterer(G)
 

@@ -7,7 +7,7 @@ from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
                              completeness_score, homogeneity_score)
 from weavenn import WeaveNN
 
-N = np.random.randint(100, 1000)
+N = np.random.randint(100, 2000)
 X, y = make_blobs(n_samples=N)
 print(f"N={N}")
 
@@ -26,10 +26,11 @@ print(f"mutual_info     = {mutual_info_score:.3f}")
 
 # create model and build graph
 # use larger k_max for larger clusters
-weave = WeaveNN(k=200, clustering_algorithm="louvain")
+weave = WeaveNN(k=200, clustering_algorithm="optimal")
+# get graph from cloud points
 G = weave.fit_transform(X)
 # get cluster labels from graph
-y_weave = weave.predict(G)
+y_weave = weave.predict(G, X=X)
 
 # compute scores
 homogeneity = homogeneity_score(y, y_weave)

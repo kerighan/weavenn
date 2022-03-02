@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder, minmax_scale, robust_scale
 
 
 classification_datasets = [
-    "iris", "wine", "mobile", "glass", "zoo", "seeds",
+    "iris", "wine", "mobile", "glass", "zoo", "seeds", "letters", "phonemes",
     "20newsgroups", "stellar", "mnist", "fashion"
 ]
 
@@ -31,6 +31,10 @@ def load(name):
         return load_glass()
     elif name == "zoo":
         return load_zoo()
+    elif name == "letters":
+        return load_letters()
+    elif name == "phonemes":
+        return load_phonemes()
     elif name == "seeds":
         return load_seeds()
     elif name == "mnist":
@@ -54,6 +58,36 @@ def load_zoo():
         pd.read_csv("datasets/zoo3.csv")])
     y = df["class_type"].values
     X = minmax_scale(df.iloc[:, 1:-1].values)
+    return X, y
+
+
+def load_letters():
+    with open("datasets/letter-recognition.data") as f:
+        data = f.read().splitlines()
+    X = []
+    y = []
+    for line in data:
+        splits = line.split(",")
+        y.append(splits[0])
+        tmp = []
+        for s in splits[1:]:
+            tmp.append(int(s))
+        X.append(tmp)
+    X = np.array(X)
+    X = minmax_scale(X)
+    le = LabelEncoder()
+    y = le.fit_transform(y)
+    return X, y
+
+
+def load_phonemes():
+    df = pd.read_csv("datasets/Phoneme Recognition.txt")
+    le = LabelEncoder()
+    y = le.fit_transform(df.g)
+    del df["g"], df["row.names"], df["speaker"]
+    X = df.values
+    # X = PCA(n_components=20).fit_transform(X)
+    # X = robust_scale(X)
     return X, y
 
 
@@ -158,4 +192,4 @@ def load_reuters():
 
 
 if __name__ == "__main__":
-    print(load_glass())
+    print(load_phonemes())
