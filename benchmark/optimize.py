@@ -12,7 +12,7 @@ from datasets import load
 # v     x       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             x        v        v
-dataset = "fashion"
+dataset = "iris"
 X, y = load(dataset)
 
 
@@ -51,7 +51,7 @@ def compare_weavenn_with_knnl():
     print()
     print(data["knnl_RAND"].max())
     print(data["weavenn_RAND"].max())
-    sheets[f"{dataset}"] = data
+    # sheets[f"{dataset}"] = data
 
 
 def optimize_hdbscan():
@@ -145,6 +145,6 @@ def optimize_affinity_propagation():
 
 if __name__ == "__main__":
     # optimize_dbscanpp()
-    optimize_optics()
+    # optimize_optics()
     # optimize_affinity_propagation()
-    # compare_weavenn_with_knnl()
+    compare_weavenn_with_knnl()
