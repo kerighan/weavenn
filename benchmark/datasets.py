@@ -13,8 +13,8 @@ from sklearn.preprocessing import LabelEncoder, minmax_scale, robust_scale
 
 
 classification_datasets = [
-    "iris", "wine", "mobile", "glass", "zoo", "seeds", "letters", "phonemes",
-    "20newsgroups", "stellar", "mnist", "fashion"
+    "iris", "wine", "mobile", "glass", "zoo", "seeds", "dates",
+    "raisin", "letters", "phonemes", "20newsgroups", "stellar", "mnist", "fashion"
 ]
 
 
@@ -24,7 +24,11 @@ def load(name):
         return res.data, res.target
     elif name == "wine":
         res = load_wine()
-        return res.data, res.target
+        X = res.data
+        X = robust_scale(X)
+        return X, res.target
+    elif name == "raisin":
+        return load_raisin()
     elif name == "mobile":
         return load_mobile()
     elif name == "glass":
@@ -37,6 +41,8 @@ def load(name):
         return load_phonemes()
     elif name == "seeds":
         return load_seeds()
+    elif name == "dates":
+        return load_dates()
     elif name == "mnist":
         return load_mnist()
     elif name == "fashion":
@@ -49,6 +55,22 @@ def load(name):
         return load_reuters()
     elif name == "mall":
         return load_mall()
+
+
+def load_raisin():
+    df = pd.read_excel("datasets/Raisin_Dataset.xlsx")
+    y = LabelEncoder().fit_transform(df["Class"])
+    del df["Class"]
+    X = minmax_scale(df.values)
+    return X, y
+
+
+def load_dates():
+    df = pd.read_excel("datasets/Date_Fruit_Datasets.xlsx")
+    X = robust_scale(df.iloc[:, 1:-1].values)
+    le = LabelEncoder()
+    y = le.fit_transform(df["Class"])
+    return X, y
 
 
 def load_zoo():
@@ -192,4 +214,4 @@ def load_reuters():
 
 
 if __name__ == "__main__":
-    print(load_phonemes())
+    load_raisin()

@@ -1,3 +1,1 @@
-from .weavenn import WeaveNN
-
-__version__ = "0.0.1"
+from .weavenn import WeaveNN, predict_knnl, score

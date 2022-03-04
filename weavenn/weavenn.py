@@ -55,7 +55,7 @@ class WeaveNN:
             # normalize distances
             dists = dists**2/(node_scaling * neighbor_scaling)
 
-            nns_i = set(neighbors)
+            # nns_i = set(neighbors)
             for index, j in enumerate(neighbors):
                 if i == j:
                     continue
@@ -63,11 +63,13 @@ class WeaveNN:
                 if pair in candidates:
                     continue
 
-                nns_j = set(labels[j])
-                nn_count = len(nns_i.intersection(nns_j)) + 1
+                # nns_j = set(labels[j])
+                # nn_count = len(nns_i.intersection(nns_j)) + 1
+                # nn_count = np.log(nn_count)
 
                 candidates.add(pair)
-                weight = 1 - np.tanh(dists[index]*np.log(nn_count))
+                # weight = 1 - np.tanh(dists[index]*np.log(nn_count))
+                weight = 1 - np.tanh(dists[index])
                 if weight < self.min_sim:
                     continue
                 edges.append((i, j, weight))
@@ -77,6 +79,45 @@ class WeaveNN:
         G.add_nodes_from(range(len(labels)))
         G.add_weighted_edges_from(edges)
         return G
+
+    # def _build_graph(self, labels, distances):
+    #     candidates = set()
+    #     local_scaling = distances[:, -1]
+    #     edges = []
+    #     a = np.log(1 - 0.01) / (np.log(np.tanh(1)))
+    #     for i, (neighbors, dists, node_scaling) in enumerate(
+    #             zip(labels, distances, local_scaling)):
+
+    #         # get node scalings
+    #         node_scaling = node_scaling.clip(1e-6, None)
+    #         neighbor_scaling = local_scaling[neighbors].clip(1e-6, None)
+    #         # normalize distances
+    #         dists = dists**2/(node_scaling * neighbor_scaling)
+
+    #         # nns_i = set(neighbors)
+    #         for index, j in enumerate(neighbors):
+    #             if i == j:
+    #                 continue
+    #             pair = (i, j) if i < j else (j, i)
+    #             if pair in candidates:
+    #                 continue
+
+    #             # nns_j = set(labels[j])
+    #             # nn_count = len(nns_i.intersection(nns_j)) + 1
+    #             # nn_count = np.log(nn_count)
+
+    #             candidates.add(pair)
+    #             # weight = 1 - np.tanh(dists[index]*np.log(nn_count))
+    #             weight = 1 - np.tanh(dists[index])**a
+    #             if weight < self.min_sim:
+    #                 continue
+    #             edges.append((i, j, weight))
+
+    #     # create graph
+    #     G = nx.Graph()
+    #     G.add_nodes_from(range(len(labels)))
+    #     G.add_weighted_edges_from(edges)
+    #     return G
 
 
 # =============================================================================
