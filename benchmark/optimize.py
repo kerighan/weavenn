@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-import oodles as oo
+# import oodles as oo
 import pandas as pd
 from tqdm import tqdm
 from weavenn.weavenn import WeaveNN, predict_knnl, score
@@ -9,15 +9,15 @@ from weavenn.weavenn import WeaveNN, predict_knnl, score
 from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, dates, raisin, phonemes
-# v     x       v    v     v      v      v      x       v
+# v     x       v    v     v      v      v      x       v      
 # stellar, 20newsgroups, fashion, letters, mnist
-# v        v             x        v        v
-dataset = "iris"
+# v        v             v        v        v
+dataset = "stellar"
 X, y = load(dataset)
 
 
 def compare_weavenn_with_knnl():
-    sheets = oo.Sheets("1JqzQUWP5UQ40Q5iLrs4vVPKqiMVAp4pOJfHNNfUWfzQ")
+    # sheets = oo.Sheets("1JqzQUWP5UQ40Q5iLrs4vVPKqiMVAp4pOJfHNNfUWfzQ")
     ks = range(20, 160, 10)
     data = []
     start = time.time()
@@ -28,7 +28,7 @@ def compare_weavenn_with_knnl():
         tmp["knnl_AMI"] = score_1
         tmp["knnl_RAND"] = score_2
 
-        y_pred = WeaveNN(k=k, min_sim=0.01).fit_predict(X)
+        y_pred = WeaveNN(k=k, min_sim=0.01, method="louvain", prune=True).fit_predict(X)
         score_1, score_2 = score(y, y_pred)
         tmp["weavenn_AMI"] = score_1
         tmp["weavenn_RAND"] = score_2
@@ -42,15 +42,15 @@ def compare_weavenn_with_knnl():
     print(data["knnl_AMI"].mean(), data["knnl_AMI"].std())
     print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
     print()
-    print(data["knnl_RAND"].mean(), data["knnl_RAND"].std())
-    print(data["weavenn_RAND"].mean(), data["weavenn_RAND"].std())
+    # print(data["knnl_RAND"].mean(), data["knnl_RAND"].std())
+    # print(data["weavenn_RAND"].mean(), data["weavenn_RAND"].std())
 
     print()
     print(data["knnl_AMI"].max())
     print(data["weavenn_AMI"].max())
-    print()
-    print(data["knnl_RAND"].max())
-    print(data["weavenn_RAND"].max())
+    # print()
+    # print(data["knnl_RAND"].max())
+    # print(data["weavenn_RAND"].max())
     # sheets[f"{dataset}"] = data
 
 

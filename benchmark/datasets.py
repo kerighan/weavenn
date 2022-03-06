@@ -141,7 +141,7 @@ def load_mnist():
     mnist = fetch_openml("mnist_784", version=1)
     X = mnist.data
     y = mnist.target.astype(int)
-    X = PCA(n_components=20).fit_transform(X)
+    X = PCA(n_components=20, random_state=0).fit_transform(X)
 
     return X, y
 
@@ -151,7 +151,7 @@ def load_fashion():
     (X, y), _ = fashion_mnist.load_data()
     X = X.astype(float) / 255.
     X = X.reshape((X.shape[0], X.shape[1] * X.shape[2]))
-    X = PCA(n_components=20).fit_transform(X)
+    X = PCA(n_components=20, random_state=0).fit_transform(X)
 
     return X, y
 
@@ -179,7 +179,7 @@ def load_20newsgroups():
 
     pipe = Pipeline([
         ("vectorizer", TfidfVectorizer(max_features=100000)),
-        ("reducer", TruncatedSVD(n_components=50))
+        ("reducer", TruncatedSVD(n_components=50, random_state=1))
     ])
     X = pipe.fit_transform(newsgroups_train.data)
     y = newsgroups_train.target

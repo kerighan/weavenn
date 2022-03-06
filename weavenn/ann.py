@@ -9,9 +9,11 @@ def get_hnswlib_nns_function(metric):
         n, dim = X.shape
 
         index = hnswlib.Index(space=metric, dim=dim)
-        index.init_index(max_elements=n, ef_construction=1000, M=1000)
+        index.init_index(
+            max_elements=n, ef_construction=2*k, M=100,
+            random_seed=100)
         index.add_items(X, range(n))
-        index.set_ef(2*k)
+        # index.set_ef(2*k)
 
         labels, distances = index.knn_query(X, k=k)
         return labels, distances
