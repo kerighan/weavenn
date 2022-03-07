@@ -11,13 +11,13 @@ ext_modules = [
         include_dirs=[
             pybind11.get_include(),
             pybind11.get_include(True), ],
-        extra_compile_args=["-Ofast", "-std=c++17", "/std:c++17", "/Ofast"])
+        extra_compile_args=["-Ofast", "-std=c++17"])
 ]
 
 
 setup(
     name="weavenn",
-    version="0.0.3",
+    version="0.0.4",
     author="Maixent Chenebaux",
     author_email="max.chbx@gmail.com",
     description="Density-aware k-nearest neighbor graph from cloud points",
