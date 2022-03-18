@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-# import oodles as oo
+import oodles as oo
 import pandas as pd
 from tqdm import tqdm
 from weavenn.weavenn import WeaveNN, predict_knnl, score
@@ -9,15 +9,40 @@ from weavenn.weavenn import WeaveNN, predict_knnl, score
 from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, dates, raisin, phonemes
-# v     x       v    v     v      v      v      x       v      
+# v     v       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "stellar"
+dataset = "iris"
 X, y = load(dataset)
 
 
-def compare_weavenn_with_knnl():
-    # sheets = oo.Sheets("1JqzQUWP5UQ40Q5iLrs4vVPKqiMVAp4pOJfHNNfUWfzQ")
+def optimize_weavenn():
+    ks = range(20, 160, 10)
+    data = []
+    start = time.time()
+    for k in tqdm(ks):
+        tmp = {"k": k}
+
+        y_pred = WeaveNN(k=k).fit_predict(X)
+        score_1, score_2 = score(y, y_pred)
+        tmp["weavenn_AMI"] = score_1
+        tmp["weavenn_RAND"] = score_2
+        print(tmp)
+
+        data.append(tmp)
+    print(time.time() - start)
+    data = pd.DataFrame(data)[
+        ["k", "weavenn_AMI", "weavenn_RAND"]]
+
+    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
+    print(data["weavenn_AMI"].max())
+
+    sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
+    sheets[dataset] = data
+
+
+def optimize_knnl():
+    sheets = oo.Sheets("1lY3ekInWwIO3KNWgab9Y7QhzswcJE1iGV0n1j3oQuag")
     ks = range(20, 160, 10)
     data = []
     start = time.time()
@@ -27,31 +52,13 @@ def compare_weavenn_with_knnl():
         score_1, score_2 = score(y, y_pred)
         tmp["knnl_AMI"] = score_1
         tmp["knnl_RAND"] = score_2
-
-        y_pred = WeaveNN(k=k, min_sim=0.01, method="louvain", prune=True).fit_predict(X)
-        score_1, score_2 = score(y, y_pred)
-        tmp["weavenn_AMI"] = score_1
-        tmp["weavenn_RAND"] = score_2
-        print(tmp)
-
         data.append(tmp)
-    print(time.time() - start)
     data = pd.DataFrame(data)[
-        ["k", "knnl_AMI", "weavenn_AMI", "knnl_RAND", "weavenn_RAND"]]
+        ["k", "knnl_AMI", "knnl_RAND"]]
 
     print(data["knnl_AMI"].mean(), data["knnl_AMI"].std())
-    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
-    print()
-    # print(data["knnl_RAND"].mean(), data["knnl_RAND"].std())
-    # print(data["weavenn_RAND"].mean(), data["weavenn_RAND"].std())
-
-    print()
     print(data["knnl_AMI"].max())
-    print(data["weavenn_AMI"].max())
-    # print()
-    # print(data["knnl_RAND"].max())
-    # print(data["weavenn_RAND"].max())
-    # sheets[f"{dataset}"] = data
+    sheets[dataset] = data
 
 
 def optimize_hdbscan():
@@ -147,4 +154,6 @@ if __name__ == "__main__":
     # optimize_dbscanpp()
     # optimize_optics()
     # optimize_affinity_propagation()
-    compare_weavenn_with_knnl()
+    # compare_weavenn_with_knnl()
+    optimize_weavenn()
+    # optimize_knnl()

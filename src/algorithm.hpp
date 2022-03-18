@@ -17,4 +17,4 @@ std::vector<std::pair<Nodes, float>> get_partitions(
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
     float min_sim, float resolution,
-    bool prune, bool full);
+    bool prune, bool full, bool z_modularity);

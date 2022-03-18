@@ -4,7 +4,7 @@
 #include <pybind11/numpy.h>
 
 namespace py = pybind11;
-using Node = uint64_t;
+using Node = int64_t;
 using Nodes = std::vector<Node>;
 using GraphNeighbors = std::vector<Nodes>;
 using Weight = float;
@@ -18,7 +18,6 @@ bool sort_by_increase(const std::tuple<Node, Node, float, Weight> &a,
 {
     return (std::get<2>(a) > std::get<2>(b));
 }
-
 
 std::tuple<Nodes, Weights, Weights, Weights, Weights, float> init_status(
     GraphNeighbors const &graph_neighbors,
@@ -77,14 +76,23 @@ float modularity(
     Weights const &internals,
     Weights const &degrees,
     float total_weight,
-    float resolution)
+    float resolution,
+    bool z_modularity)
 {
     float result = 0;
+    float m = 2. * total_weight;
     for (Node com = 0; com < degrees.size(); com++)
     {
-        float tmp = degrees[com] / (2. * total_weight);
-        result += resolution * internals[com] / total_weight;
-        result -= tmp * tmp;
+        float Q_c = resolution * internals[com] / total_weight;
+        float ratio = degrees[com] / m;
+        ratio *= ratio;
+
+        Q_c -= ratio;
+        if (z_modularity)
+        {
+            Q_c /= sqrt(ratio * (1 - ratio));
+        }
+        result += Q_c;
     }
     return result;
 }
@@ -120,13 +128,15 @@ void one_level(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution)
+    float resolution,
+    bool z_modularity)
 {
     bool modified = true;
     float cur_mod = modularity(internals,
                                degrees,
                                total_weight,
-                               resolution);
+                               resolution,
+                               z_modularity);
     float new_mod = cur_mod;
     size_t n_nodes = graph_neighbors.size();
     float m = 2 * total_weight;
@@ -155,7 +165,16 @@ void one_level(
                 if (weight <= 0)
                     continue;
 
-                float increase = resolution * weight - degrees[com] * node_gdegree / m;
+                float increase = resolution * weight;
+                increase -= degrees[com] * node_gdegree / m;
+
+                if (z_modularity)
+                {
+                    float ratio = degrees[com] / m;
+                    ratio *= ratio;
+                    increase /= sqrt(ratio * (1 - ratio));
+                }
+
                 if (increase > best_increase)
                 {
                     best_increase = increase;
@@ -174,7 +193,8 @@ void one_level(
         new_mod = modularity(internals,
                              degrees,
                              total_weight,
-                             resolution);
+                             resolution,
+                             z_modularity);
         if (new_mod - cur_mod < 0.0000001)
             break;
     }
@@ -189,7 +209,8 @@ void one_level_prune(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution)
+    float resolution,
+    bool z_modularity)
 {
     size_t n_nodes = graph_neighbors.size();
     float m = 2 * total_weight;
@@ -223,6 +244,12 @@ void one_level_prune(
 
             float increase = resolution * weight;
             increase -= degrees[com] * gdegrees[node] / m;
+
+            if (z_modularity)
+            {
+                float ratio = degrees[com] / m;
+                increase /= sqrt(ratio * ratio * (1 - ratio * ratio));
+            }
             if (increase > best_increase)
             {
                 best_increase = increase;
@@ -259,7 +286,8 @@ void one_step(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution)
+    float resolution,
+    bool z_modularity)
 {
     size_t n_nodes = graph_neighbors.size();
     float m = 2 * total_weight;
@@ -286,6 +314,11 @@ void one_step(
                 continue;
 
             float increase = resolution * weight - degrees[com] * node_gdegree / m;
+            if (z_modularity)
+            {
+                float ratio = degrees[com] / m;
+                increase /= sqrt(ratio * ratio * (1 - ratio * ratio));
+            }
             if (increase > best_increase)
             {
                 best_increase = increase;
@@ -408,7 +441,8 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
     GraphWeights &graph_weights,
     float resolution,
     bool prune,
-    bool full)
+    bool full,
+    bool z_modularity)
 {
     float mod;
     float new_mod;
@@ -428,14 +462,15 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
     if (prune)
         one_level_prune(graph_neighbors, graph_weights,
                         node2com, internals, loops, degrees, gdegrees,
-                        total_weight, resolution);
+                        total_weight, resolution, z_modularity);
     else
         one_level(graph_neighbors, graph_weights,
                   node2com, internals, loops, degrees, gdegrees,
-                  total_weight, resolution);
+                  total_weight, resolution, z_modularity);
 
     // new_mod
-    new_mod = modularity(internals, degrees, total_weight, resolution);
+    new_mod = modularity(
+        internals, degrees, total_weight, resolution, z_modularity);
 
     // renumber
     std::tie(communities, node2com) = renumber(
@@ -463,15 +498,16 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
         {
             one_level_prune(graph_neighbors, graph_weights,
                             node2com, internals, loops, degrees, gdegrees,
-                            total_weight, resolution);
+                            total_weight, resolution, z_modularity);
         }
         else
         {
             one_level(graph_neighbors, graph_weights,
                       node2com, internals, loops, degrees, gdegrees,
-                      total_weight, resolution);
+                      total_weight, resolution, z_modularity);
         }
-        new_mod = modularity(internals, degrees, total_weight, resolution);
+        new_mod = modularity(
+            internals, degrees, total_weight, resolution, z_modularity);
         if (new_mod - mod < 0.0000001)
         {
             break;
@@ -492,15 +528,17 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
                  total_weight) = init_status(graph_neighbors, graph_weights);
     }
 
-    if (full){
+    if (full)
+    {
         size_t node2com_size = node2com.size();
         while (true)
         {
             // one iteration
             one_step(graph_neighbors, graph_weights,
                      node2com, internals, loops, degrees, gdegrees,
-                     total_weight, resolution);
-            new_mod = modularity(internals, degrees, total_weight, resolution);
+                     total_weight, resolution, z_modularity);
+            new_mod = modularity(
+                internals, degrees, total_weight, resolution, z_modularity);
             std::tie(communities, node2com) = renumber(
                 graph_neighbors, graph_weights, node2com);
             partition_list.push_back(

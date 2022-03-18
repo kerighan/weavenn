@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "louvain.hpp"
+#include <algorithm>
 
 namespace py = pybind11;
 
@@ -44,41 +45,68 @@ std::pair<GraphNeighbors, GraphWeights> get_graph(
     graph_neighbors.resize(n_nodes);
     graph_weights.resize(n_nodes);
 
+    float scale = acosh(k / log2(k));
+
+    // compute average convexity
+    float convexity = 0;
     for (uint64_t i = 0; i < n_nodes; i++)
     {
-        float node_scaling = local_scaling[i];
-        if (node_scaling < 0.000001)
-            node_scaling = 0.000001;
+        float sigma_i = local_scaling[i];
+        float conv = 0;
+        for (size_t index = 0; index < k; index++)
+        {
+            float dist = distances[i * k + index];
+            conv += index * sigma_i / (k - 1) - dist;
+        }
+
+        if (sigma_i == 0) // case where nns distances are flat
+            conv = 0.5;
+        else
+            conv /= ((k - 1) * sigma_i) / 2;
+        convexity += conv;
+    }
+    convexity /= n_nodes;
+    float curvature = (1 + convexity) / (1 - convexity);
+
+    for (uint64_t i = 0; i < n_nodes; i++)
+    {
+        float sigma_i = local_scaling[i];
+        if (sigma_i < 0.000001)
+            sigma_i = 0.000001;
 
         for (size_t index = 0; index < k; index++)
         {
             uint64_t j = labels[i * k + index];
             if (i == j)
                 continue;
-
             std::pair<uint64_t, uint64_t> pair;
             if (i < j)
                 pair = std::make_pair(i, j);
             else
                 pair = std::make_pair(j, i);
-
             if (visited.find(pair) != visited.end())
                 continue;
             visited.insert(pair);
 
-            float neighbor_scaling = local_scaling[j];
-            if (neighbor_scaling < 0.000001)
-                neighbor_scaling = 0.000001;
+            float sigma_j = local_scaling[j];
+            if (sigma_j < 0.000001)
+                sigma_j = 0.000001;
 
-            double dist = distances[i * k + index];
-            dist = (dist * dist) / (node_scaling * neighbor_scaling);
-            double weight = 1. - tanh(dist);
+            float dist = distances[i * k + index];
 
-            // double a = dist/node_scaling;
-            // double b = dist/neighbor_scaling;
-            // double weight_a = 1. - tanh(a*a);
-            // double weight_b = 1. - tanh(b*b);
-            // double weight = (weight_a + weight_b)/2;
+            float weight;
+            if (dist == 0)
+            {
+                weight = 1;
+            }
+            else
+            {
+                float dist_i = dist / sigma_i;
+                float dist_j = dist / sigma_j;
+                dist_i = pow(dist_i, curvature);
+                dist_j = pow(dist_j, curvature);
+                weight = 1 / cosh(dist_i * dist_j * scale);
+            }
 
             if (weight < min_sim)
                 continue;
@@ -97,8 +125,9 @@ std::vector<std::pair<Nodes, float>> get_partitions(
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
     float min_sim, float resolution,
-    bool prune, bool full)
+    bool prune, bool full, bool z_modularity)
 {
     auto [graph_neighbors, graph_weights] = get_graph(_labels, _distances, _local_scaling, min_sim);
-    return generate_dendrogram(graph_neighbors, graph_weights, resolution, prune, full);
+    return generate_dendrogram(
+        graph_neighbors, graph_weights, resolution, prune, full, z_modularity);
 }

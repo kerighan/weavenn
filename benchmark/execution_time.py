@@ -26,7 +26,7 @@ for N in range(10000, 500000, 10000):
     elapsed_hdbscan = time.time() - start
 
     start = time.time()
-    y_weavenn = WeaveNN(k=50, method="louvain").fit_predict(X)
+    y_weavenn = WeaveNN(k=100, method="louvain").fit_predict(X)
     elapsed_weavenn = time.time() - start
 
     print(N)

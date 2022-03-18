@@ -2,9 +2,10 @@ import time
 
 import networkx as nx
 import numpy as np
+from _weavenn import generate_dendrogram, get_partitions
+from sklearn.metrics import davies_bouldin_score
 
 from .ann import get_ann_algorithm
-from _weavenn import get_partitions, generate_dendrogram
 
 
 class WeaveNN:
@@ -13,9 +14,11 @@ class WeaveNN:
         k=100,
         ann_algorithm="hnswlib",
         method="louvain",
+        score="modularity",
         prune=False,
         metric="l2",
         min_sim=.01,
+        z_modularity=False,
         verbose=False
     ):
         self.k = k
@@ -24,9 +27,13 @@ class WeaveNN:
         self.prune = prune
         self.min_sim = min_sim
         self.verbose = verbose
+        self.score = score
+        self.z_modularity = z_modularity
 
     def fit_predict(self, X, resolution=1.):
         labels, distances = self._get_nns(X, min(len(X), self.k))
+        if self.verbose:
+            print("[*] Computed nearest neighbors")
 
         n_nodes = X.shape[0]
         local_scaling = np.array(distances[:, -1])
@@ -34,25 +41,38 @@ class WeaveNN:
         if self.method == "louvain":
             partitions = get_partitions(labels, distances, local_scaling,
                                         self.min_sim, resolution,
-                                        self.prune, False)
+                                        self.prune, False, self.z_modularity)
             y, _ = extract_partition(partitions, n_nodes, 1)
             return y
         else:
-            from sklearn.metrics import davies_bouldin_score as scoring
+            if self.score == "modularity":
+                def scoring(X, y, Q):
+                    return Q
+            elif self.score == "davies_bouldin":
+                from sklearn.metrics import davies_bouldin_score
+
+                def scoring(X, y, Q):
+                    return -davies_bouldin_score(X, y)
+            elif self.score == "silhouette":
+                from sklearn.metrics import silhouette_score
+
+                def scoring(X, y, Q):
+                    return silhouette_score(X, y)
+
             partitions = get_partitions(labels, distances, local_scaling,
                                         self.min_sim, resolution,
-                                        self.prune, True)
+                                        self.prune, True, self.z_modularity)
 
             best_score = -float("inf")
             best_y = None
             last_score = -float("inf")
             for level in range(1, len(partitions) + 1):
                 y, Q = extract_partition(partitions, n_nodes, level)
+
                 try:
-                    score = -scoring(X, y)
+                    score = scoring(X, y, Q)
                 except ValueError:
                     score = -float("inf")
-                score = Q
                 if score >= best_score:
                     best_y = y.copy()
                     best_score = score
@@ -71,26 +91,16 @@ class WeaveNN:
 
 
 def predict_knnl(X, k=100):
-    from louvaincpp import louvain
+    from cylouvain import best_partition
 
     ann = get_ann_algorithm("hnswlib", "l2")
     labels, _ = ann(X, k)
 
-    # edges = set()
-    # for i, row in enumerate(labels):
-    #     for j in row:
-    #         if i == j:
-    #             continue
-    #         pair = (i, j) if i < j else (j, i)
-    #         edges.add(pair)
-    # G = nx.Graph()
-    # G.add_nodes_from(range(len(X)))
-    # G.add_edges_from(edges)
-    # return louvain(G)
     n_nodes = X.shape[0]
     graph_neighbors = [[] for _ in range(n_nodes)]
     graph_weights = [[] for _ in range(n_nodes)]
     visited = set()
+    edges = []
     for i, row in enumerate(labels):
         for j in row:
             if i == j:
@@ -99,14 +109,14 @@ def predict_knnl(X, k=100):
             if pair in visited:
                 continue
             visited.add(pair)
-
-            graph_neighbors[i].append(j)
-            graph_neighbors[j].append(i)
-            graph_weights[i].append(1.)
-            graph_weights[j].append(1.)
-    partitions = generate_dendrogram(
-        graph_neighbors, graph_weights, 1., False, False)
-    y, _ = extract_partition(partitions, n_nodes, 1)
+            edges.append((i, j))
+    G = nx.Graph()
+    G.add_nodes_from(range(n_nodes))
+    G.add_edges_from(edges)
+    partition = best_partition(G)
+    y = np.zeros(n_nodes, dtype=int)
+    for i, val in partition.items():
+        y[i] = val
     return y
 
 
@@ -136,4 +146,3 @@ def get_outliers(partition):
     n_nodes = defaultdict(int)
     for node, com in partition.items():
         pass
-

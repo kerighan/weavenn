@@ -3,7 +3,7 @@
 #include <pybind11/numpy.h>
 
 namespace py = pybind11;
-using Node = uint64_t;
+using Node = int64_t;
 using Nodes = std::vector<Node>;
 using GraphNeighbors = std::vector<Nodes>;
 using Weight = float;
@@ -19,7 +19,8 @@ float modularity(
     Weights const &internals,
     Weights const &degrees,
     float total_weight,
-    float resolution);
+    float resolution,
+    bool z_modularity);
 
 WeightMap neighcom(
     GraphNeighbors const &graph_neighbors,
@@ -36,7 +37,8 @@ void one_level(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution);
+    float resolution,
+    bool z_modularity);
 
 void one_level_prune(
     GraphNeighbors const &graph_neighbors,
@@ -47,7 +49,8 @@ void one_level_prune(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution);
+    float resolution,
+    bool z_modularity);
 
 void one_step(
     GraphNeighbors const &graph_neighbors,
@@ -58,7 +61,8 @@ void one_step(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution);
+    float resolution,
+    bool z_modularity);
 
 std::tuple<GraphNeighbors, Nodes> renumber(
     GraphNeighbors const &graph_neighbors,
@@ -78,4 +82,5 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
     GraphWeights &graph_weights,
     float resolution,
     bool prune,
-    bool full);
+    bool full,
+    bool z_modularity);

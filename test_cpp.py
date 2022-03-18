@@ -1,14 +1,15 @@
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.datasets import make_blobs
 
 from weavenn import WeaveNN, score
-import matplotlib.pyplot as plt
-import numpy as np
-import time
 
-n_clusters = 10
+n_clusters = 15
 X, y = make_blobs(
     30000, n_features=2,
-    cluster_std=.6*np.random.random(size=(n_clusters,)), centers=n_clusters)
+    cluster_std=.4*np.random.random(size=(n_clusters,)), centers=n_clusters)
 
 start = time.time()
 y_pred = WeaveNN(k=75, prune=False, method="louvain").fit_predict(X)
@@ -36,9 +37,8 @@ ax1.set_title('Louvain')
 ax1.scatter(X[:, 0], X[:, 1], c=y_pred, s=1)
 
 ax2.set_title('Louvain-optimal')
-ax2.scatter(X[:, 0], X[:, 1], c=y_pred_3, s=1)
-plt.show()
+ax2.scatter(X[:, 0], X[:, 1], c=y_pred_2, s=1)
 
-ax2.set_title('Louvain-optimal-prune')
-ax2.scatter(X[:, 0], X[:, 1], c=y_pred_3, s=1)
+ax3.set_title('Louvain-optimal-prune')
+ax3.scatter(X[:, 0], X[:, 1], c=y_pred_3, s=1)
 plt.show()
