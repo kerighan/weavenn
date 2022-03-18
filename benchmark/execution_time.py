@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-# import oodles as oo
+import oodles as oo
 import pandas as pd
 from hdbscan import HDBSCAN
 from sklearn.cluster import KMeans
@@ -13,11 +13,12 @@ np.random.seed(0)
 N = 1000
 n_states = 10
 random_state = np.random.randint(100, 1000000)
+tables = oo.Sheets("14LllQq7uNV_YExQxEEEXdhnJEpF5RC4QhQ_rI4skvAQ")
 # tables = oo.Sheets("14LllQq7uNV_YExQxEEEXdhnJEpF5RC4QhQ_rI4skvAQ")
 
 dim = 2
 res = []
-for N in range(10000, 500000, 10000):
+for N in range(50000, 500000, 50000):
     X, y = make_blobs(n_samples=N, n_features=dim,
                       cluster_std=2, random_state=random_state)
 
@@ -41,8 +42,7 @@ for N in range(10000, 500000, 10000):
     print()
 
 res = pd.DataFrame(res)
-res.to_pickle("execution.p")
-# tables["execution_time"] = res
+tables["execution_time"] = res
 # print(res)
 
 # print(f"N={N}")

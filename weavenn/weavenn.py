@@ -13,7 +13,7 @@ class WeaveNN:
         k=100,
         ann_algorithm="hnswlib",
         method="louvain",
-        score="modularity",
+        score="davies_bouldin",
         prune=False,
         metric="l2",
         min_sim=.01,

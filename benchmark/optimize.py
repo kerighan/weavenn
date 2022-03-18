@@ -12,7 +12,7 @@ from datasets import load
 # v     v       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "iris"
+dataset = "mnist"
 X, y = load(dataset)
 
 
@@ -37,8 +37,8 @@ def optimize_weavenn():
     print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
     print(data["weavenn_AMI"].max())
 
-    sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
-    sheets[dataset] = data
+    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
+    # sheets[dataset] = data
 
 
 def optimize_knnl():
@@ -106,8 +106,18 @@ def optimize_dbscanpp():
     values = {
         "iris": (1, 4),
         "mobile": (1, 800),
-        "zoo": (.1, 4),
-        "wine": (.1, 500),
+        "zoo": (.1, 3),
+        "wine": (.1, 10),
+        "glass": (.1, 10),
+        "seeds": (.1, 5),
+        "dates": (1, 5),
+        "raisin": (.1, 1),
+        "phonemes": (.1, 100),
+        "stellar": (.2, 3),
+        "20newsgroups": (.1, .4),
+        "fashion": (1, 4),
+        "letters": (.1, .5),
+        "mnist": (200, 1200),
     }
 
     min_eps, max_eps = values[dataset]
@@ -115,17 +125,18 @@ def optimize_dbscanpp():
     scores = []
     for epsilon in tqdm(epsilons):
         for p in [.1, .2, .3]:
-            # try:
-            dbscanpp = DBSCANPP(
-                p=p,
-                eps_density=epsilon,
-                eps_clustering=epsilon*2, minPts=4)
-            y_pred = dbscanpp.fit_predict(X, init="k-centers")
-            score_1, score_2 = score(y, y_pred)
-            scores.append(
-                {"eps": epsilon, "AMI": score_1, "rand": score_2})
-            # except ValueError:
-            #     scores.append({"eps": epsilon, "AMI": 0, "rand": 0})
+            try:
+                dbscanpp = DBSCANPP(
+                    p=p,
+                    eps_density=epsilon,
+                    eps_clustering=epsilon, minPts=4)
+                y_pred = dbscanpp.fit_predict(X, init="k-centers")
+                score_1, score_2 = score(y, y_pred)
+                scores.append(
+                    {"eps": epsilon, "p": p, "AMI": score_1, "rand": score_2})
+                print(score_1)
+            except ValueError:
+                scores.append({"eps": epsilon, "p": p, "AMI": 0, "rand": 0})
 
     scores = pd.DataFrame(scores)
     sheets[dataset] = scores
@@ -144,16 +155,14 @@ def optimize_affinity_propagation():
         score_1, score_2 = score(y, y_pred)
         scores.append(
             {"damping": d, "AMI": score_1, "rand": score_2})
-
     scores = pd.DataFrame(scores)
     sheets[dataset] = scores
     print(scores.max(axis=0))
 
 
 if __name__ == "__main__":
-    # optimize_dbscanpp()
+    optimize_dbscanpp()
     # optimize_optics()
     # optimize_affinity_propagation()
-    # compare_weavenn_with_knnl()
-    optimize_weavenn()
+    # optimize_weavenn()
     # optimize_knnl()
