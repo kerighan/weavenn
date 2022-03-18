@@ -25,7 +25,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=["networkx", "numpy",
-                      "scikit-learn", "louvaincpp"],
+                      "scikit-learn"],
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
