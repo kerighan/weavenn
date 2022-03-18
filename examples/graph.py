@@ -8,7 +8,6 @@ from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,
 from weavenn import WeaveNN
 
 N = np.random.randint(100, 2000)
-# N = 1000
 X, y = make_blobs(n_samples=N, n_features=2, cluster_std=1)
 print(f"N={N}")
 

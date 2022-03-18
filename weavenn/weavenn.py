@@ -2,8 +2,7 @@ import time
 
 import networkx as nx
 import numpy as np
-from _weavenn import generate_dendrogram, get_partitions
-from sklearn.metrics import davies_bouldin_score
+from _weavenn import get_graph, get_partitions
 
 from .ann import get_ann_algorithm
 
@@ -58,6 +57,11 @@ class WeaveNN:
 
                 def scoring(X, y, Q):
                     return silhouette_score(X, y)
+            elif self.score == "calinski_harabasz":
+                from sklearn.metrics import calinski_harabasz_score
+
+                def scoring(X, y, Q):
+                    return calinski_harabasz_score(X, y)
 
             partitions = get_partitions(labels, distances, local_scaling,
                                         self.min_sim, resolution,
@@ -80,9 +84,22 @@ class WeaveNN:
             return best_y
 
     def fit_transform(self, X):
+        import networkx as nx
         labels, distances = self._get_nns(X, min(len(X), self.k))
-        graph_neighbors, graph_weights = self._build_graph(labels, distances)
-        return graph_neighbors, graph_weights
+        local_scaling = np.array(distances[:, -1])
+        # get adjacency list
+        graph_neighbors, graph_weights = get_graph(
+            labels, distances, local_scaling, self.min_sim)
+        # build networkx graph
+        G = nx.Graph()
+        for i in range(len(graph_neighbors)):
+            G.add_node(i)
+            neighbors = graph_neighbors[i]
+            weights = graph_weights[i]
+            for index in range(len(neighbors)):
+                j = neighbors[index]
+                G.add_edge(i, j, weight=weights[index])
+        return G
 
 
 # =============================================================================
