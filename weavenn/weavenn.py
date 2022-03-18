@@ -114,8 +114,6 @@ def predict_knnl(X, k=100):
     labels, _ = ann(X, k)
 
     n_nodes = X.shape[0]
-    graph_neighbors = [[] for _ in range(n_nodes)]
-    graph_weights = [[] for _ in range(n_nodes)]
     visited = set()
     edges = []
     for i, row in enumerate(labels):
