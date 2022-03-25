@@ -17,6 +17,7 @@ class WeaveNN:
         prune=False,
         metric="l2",
         min_sim=.01,
+        min_cluster_size=2,
         z_modularity=False,
         verbose=False
     ):
@@ -27,6 +28,7 @@ class WeaveNN:
         self.min_sim = min_sim
         self.verbose = verbose
         self.score = score
+        self.min_cluster_size = min_cluster_size
         self.z_modularity = z_modularity
 
     def fit_predict(self, X, resolution=1.):
@@ -42,7 +44,7 @@ class WeaveNN:
                                         self.min_sim, resolution,
                                         self.prune, False, self.z_modularity)
             y, _ = extract_partition(partitions, n_nodes, 1)
-            return y
+            return relabel(y, min_cluster_size=min_cluster_size)
         else:
             if self.score == "modularity":
                 def scoring(X, y, Q):
@@ -81,7 +83,7 @@ class WeaveNN:
                     best_y = y.copy()
                     best_score = score
                 last_score = score
-            return best_y
+            return relabel(best_y, min_cluster_size=min_cluster_size)
 
     def fit_transform(self, X):
         import networkx as nx
@@ -155,9 +157,18 @@ def extract_partition(dendrogram, n_nodes, level):
     return partition, Q
 
 
-def get_outliers(partition):
-    from collections import defaultdict
+def relabel(partition, min_cluster_size=2):
+    cm_to_nodes = {}
+    for node, com in enumerate(partition):
+        cm_to_nodes.setdefault(com, []).append(node)
 
-    n_nodes = defaultdict(int)
-    for node, com in partition.items():
-        pass
+    cm_to_nodes = sorted(cm_to_nodes.items(),
+                         key=lambda x: len(x[1]), reverse=True)
+    for i, (_, nodes) in enumerate(cm_to_nodes):
+        if len(nodes) < min_cluster_size:
+            for node in nodes:
+                partition[node] = -1
+        else:
+            for node in nodes:
+                partition[node] = i
+    return partition

@@ -12,7 +12,7 @@ from datasets import load
 # v     v       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "mnist"
+dataset = "20newsgroups"
 X, y = load(dataset)
 
 
@@ -39,6 +39,32 @@ def optimize_weavenn():
 
     # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
     # sheets[dataset] = data
+
+
+def optimize_weavenn_full():
+    ks = range(20, 160, 10)
+    data = []
+    start = time.time()
+    for k in tqdm(ks):
+        for min_sim in [.0001, .001, .01, .1, .25, .5, .8]:
+            tmp = {"k": k, "min_sim": min_sim}
+
+            y_pred = WeaveNN(k=k, min_sim=min_sim, prune=False).fit_predict(X)
+            score_1, score_2 = score(y, y_pred)
+            tmp["weavenn_AMI"] = score_1
+            tmp["weavenn_RAND"] = score_2
+            print(tmp)
+
+            data.append(tmp)
+    print(time.time() - start)
+    data = pd.DataFrame(data)[
+        ["k", "min_sim", "weavenn_AMI", "weavenn_RAND"]]
+
+    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
+    print(data["weavenn_AMI"].max())
+
+    sheets = oo.Sheets("1jYHWTxRoahdrT06ofOoqmUMLgnRxy0OxppsFAoB_e60")
+    sheets[dataset] = data
 
 
 def optimize_knnl():
@@ -161,8 +187,9 @@ def optimize_affinity_propagation():
 
 
 if __name__ == "__main__":
-    optimize_dbscanpp()
+    # optimize_dbscanpp()
     # optimize_optics()
     # optimize_affinity_propagation()
-    # optimize_weavenn()
+    optimize_weavenn()
     # optimize_knnl()
+    # optimize_weavenn_full()
