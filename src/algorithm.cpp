@@ -19,7 +19,7 @@ struct hash_pair
     }
 };
 
-std::pair<GraphNeighbors, GraphWeights> get_graph(
+std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
@@ -42,8 +42,10 @@ std::pair<GraphNeighbors, GraphWeights> get_graph(
 
     GraphNeighbors graph_neighbors;
     GraphWeights graph_weights;
+    Weights sigma_count;
     graph_neighbors.resize(n_nodes);
     graph_weights.resize(n_nodes);
+    sigma_count.resize(n_nodes);
 
     float scale = acosh(k / log2(k));
 
@@ -101,11 +103,8 @@ std::pair<GraphNeighbors, GraphWeights> get_graph(
             }
             else
             {
-                float dist_i = dist / sigma_i;
-                float dist_j = dist / sigma_j;
-                dist_i = pow(dist_i, curvature);
-                dist_j = pow(dist_j, curvature);
-                weight = 1 / cosh(dist_i * dist_j * scale);
+                dist = pow(dist * dist / (sigma_i * sigma_j), curvature);
+                weight = 1 / cosh(dist * scale);
             }
 
             if (weight < min_sim)
@@ -115,19 +114,24 @@ std::pair<GraphNeighbors, GraphWeights> get_graph(
             graph_neighbors[j].push_back(i);
             graph_weights[i].push_back(weight);
             graph_weights[j].push_back(weight);
+            sigma_count[i] += weight;
+            sigma_count[j] += weight;
         }
     }
-    return std::make_pair(graph_neighbors, graph_weights);
+    return std::make_tuple(graph_neighbors, graph_weights, sigma_count);
 }
 
-std::vector<std::pair<Nodes, float>> get_partitions(
+std::pair<std::vector<std::pair<Nodes, float>>, Weights> get_partitions(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
     float min_sim, float resolution,
     bool prune, bool full, bool z_modularity)
 {
-    auto [graph_neighbors, graph_weights] = get_graph(_labels, _distances, _local_scaling, min_sim);
-    return generate_dendrogram(
-        graph_neighbors, graph_weights, resolution, prune, full, z_modularity);
+    auto [graph_neighbors, graph_weights, sigma_count] = get_graph(
+        _labels, _distances, _local_scaling, min_sim);
+    return std::make_pair(
+        generate_dendrogram(
+            graph_neighbors, graph_weights, resolution, prune, full, z_modularity),
+        sigma_count);
 }

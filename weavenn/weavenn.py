@@ -10,14 +10,14 @@ from .ann import get_ann_algorithm
 class WeaveNN:
     def __init__(
         self,
-        k=100,
+        k=50,
         ann_algorithm="hnswlib",
         method="louvain",
-        score="davies_bouldin",
+        score="calinski_harabasz",
         prune=False,
         metric="l2",
         min_sim=.01,
-        min_cluster_size=2,
+        min_sc=None,
         z_modularity=False,
         verbose=False
     ):
@@ -26,9 +26,9 @@ class WeaveNN:
         self.method = method
         self.prune = prune
         self.min_sim = min_sim
+        self.min_sc = min_sc
         self.verbose = verbose
         self.score = score
-        self.min_cluster_size = min_cluster_size
         self.z_modularity = z_modularity
 
     def fit_predict(self, X, resolution=1.):
@@ -40,41 +40,42 @@ class WeaveNN:
         local_scaling = np.array(distances[:, -1])
 
         if self.method == "louvain":
-            partitions = get_partitions(labels, distances, local_scaling,
-                                        self.min_sim, resolution,
-                                        self.prune, False, self.z_modularity)
+            partitions, sigma_count = get_partitions(
+                labels, distances, local_scaling,
+                self.min_sim, resolution,
+                self.prune, False, self.z_modularity)
             y, _ = extract_partition(partitions, n_nodes, 1)
-            return relabel(y, min_cluster_size=min_cluster_size)
+            return relabel(
+                y, k=self.k, sigma_count=sigma_count, min_sc=self.min_sc)
         else:
             if self.score == "modularity":
-                def scoring(X, y, Q):
+                def scoring(_, __, Q):
                     return Q
             elif self.score == "davies_bouldin":
                 from sklearn.metrics import davies_bouldin_score
 
-                def scoring(X, y, Q):
+                def scoring(X, y, _):
                     return -davies_bouldin_score(X, y)
             elif self.score == "silhouette":
                 from sklearn.metrics import silhouette_score
 
-                def scoring(X, y, Q):
+                def scoring(X, y, _):
                     return silhouette_score(X, y)
             elif self.score == "calinski_harabasz":
                 from sklearn.metrics import calinski_harabasz_score
 
-                def scoring(X, y, Q):
+                def scoring(X, y, _):
                     return calinski_harabasz_score(X, y)
 
-            partitions = get_partitions(labels, distances, local_scaling,
-                                        self.min_sim, resolution,
-                                        self.prune, True, self.z_modularity)
+            partitions, sigma_count = get_partitions(
+                labels, distances, local_scaling,
+                self.min_sim, resolution,
+                self.prune, True, self.z_modularity)
 
             best_score = -float("inf")
             best_y = None
-            last_score = -float("inf")
             for level in range(1, len(partitions) + 1):
                 y, Q = extract_partition(partitions, n_nodes, level)
-
                 try:
                     score = scoring(X, y, Q)
                 except ValueError:
@@ -82,15 +83,15 @@ class WeaveNN:
                 if score >= best_score:
                     best_y = y.copy()
                     best_score = score
-                last_score = score
-            return relabel(best_y, min_cluster_size=min_cluster_size)
+            return relabel(
+                best_y, k=self.k, sigma_count=sigma_count, min_sc=self.min_sc)
 
     def fit_transform(self, X):
         import networkx as nx
         labels, distances = self._get_nns(X, min(len(X), self.k))
         local_scaling = np.array(distances[:, -1])
         # get adjacency list
-        graph_neighbors, graph_weights = get_graph(
+        graph_neighbors, graph_weights, _ = get_graph(
             labels, distances, local_scaling, self.min_sim)
         # build networkx graph
         G = nx.Graph()
@@ -157,7 +158,14 @@ def extract_partition(dendrogram, n_nodes, level):
     return partition, Q
 
 
-def relabel(partition, min_cluster_size=2):
+def relabel(partition, k=None, sigma_count=None, min_sc=None):
+
+    if min_sc is not None:
+        for i, sc in enumerate(sigma_count):
+            sc /= k
+            if sc < min_sc:
+                partition[i] = -1
+
     cm_to_nodes = {}
     for node, com in enumerate(partition):
         cm_to_nodes.setdefault(com, []).append(node)
@@ -165,10 +173,6 @@ def relabel(partition, min_cluster_size=2):
     cm_to_nodes = sorted(cm_to_nodes.items(),
                          key=lambda x: len(x[1]), reverse=True)
     for i, (_, nodes) in enumerate(cm_to_nodes):
-        if len(nodes) < min_cluster_size:
-            for node in nodes:
-                partition[node] = -1
-        else:
-            for node in nodes:
-                partition[node] = i
+        for node in nodes:
+            partition[node] = _
     return partition
