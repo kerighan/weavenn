@@ -114,8 +114,8 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
             graph_neighbors[j].push_back(i);
             graph_weights[i].push_back(weight);
             graph_weights[j].push_back(weight);
-            sigma_count[i] += weight;
-            sigma_count[j] += weight;
+            sigma_count[i] += weight / k;
+            sigma_count[j] += weight / k;
         }
     }
     return std::make_tuple(graph_neighbors, graph_weights, sigma_count);

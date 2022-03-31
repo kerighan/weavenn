@@ -4,6 +4,8 @@ import networkx as nx
 import numpy as np
 from _weavenn import get_graph, get_partitions
 
+from weavenn.score import get_scoring_function
+
 from .ann import get_ann_algorithm
 
 
@@ -12,7 +14,7 @@ class WeaveNN:
         self,
         k=50,
         ann_algorithm="hnswlib",
-        method="louvain",
+        method="auto",
         score="calinski_harabasz",
         prune=False,
         metric="l2",
@@ -36,55 +38,47 @@ class WeaveNN:
         if self.verbose:
             print("[*] Computed nearest neighbors")
 
-        n_nodes = X.shape[0]
+        n_nodes, dim = X.shape
         local_scaling = np.array(distances[:, -1])
 
-        if self.method == "louvain":
+        method = "louvain"
+        if self.method == "auto":
+            if dim == 2:
+                method = "optimal"
+
+        if method == "louvain":
             partitions, sigma_count = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
                 self.prune, False, self.z_modularity)
+            self._sigma_count = sigma_count
+
             y, _ = extract_partition(partitions, n_nodes, 1)
+
+            if self.min_sc is None:
+                min_sc = None
+            else:
+                min_sc = np.percentile(
+                    sigma_count, int(round(self.min_sc * 100)))
             return relabel(
-                y, k=self.k, sigma_count=sigma_count, min_sc=self.min_sc)
+                y, sigma_count=sigma_count, min_sc=min_sc)
         else:
-            if self.score == "modularity":
-                def scoring(_, __, Q):
-                    return Q
-            elif self.score == "davies_bouldin":
-                from sklearn.metrics import davies_bouldin_score
-
-                def scoring(X, y, _):
-                    return -davies_bouldin_score(X, y)
-            elif self.score == "silhouette":
-                from sklearn.metrics import silhouette_score
-
-                def scoring(X, y, _):
-                    return silhouette_score(X, y)
-            elif self.score == "calinski_harabasz":
-                from sklearn.metrics import calinski_harabasz_score
-
-                def scoring(X, y, _):
-                    return calinski_harabasz_score(X, y)
-
             partitions, sigma_count = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
                 self.prune, True, self.z_modularity)
+            self._sigma_count = sigma_count
 
-            best_score = -float("inf")
-            best_y = None
-            for level in range(1, len(partitions) + 1):
-                y, Q = extract_partition(partitions, n_nodes, level)
-                try:
-                    score = scoring(X, y, Q)
-                except ValueError:
-                    score = -float("inf")
-                if score >= best_score:
-                    best_y = y.copy()
-                    best_score = score
+            y = extract_optimal_partition(
+                X, partitions, n_nodes, self.score)
+
+            if self.min_sc is None:
+                min_sc = None
+            else:
+                min_sc = np.percentile(
+                    sigma_count, int(round(self.min_sc * 100)))
             return relabel(
-                best_y, k=self.k, sigma_count=sigma_count, min_sc=self.min_sc)
+                y, sigma_count=sigma_count, min_sc=min_sc)
 
     def fit_transform(self, X):
         import networkx as nx
@@ -94,6 +88,7 @@ class WeaveNN:
         graph_neighbors, graph_weights, _ = get_graph(
             labels, distances, local_scaling, self.min_sim)
         # build networkx graph
+        visited = set()
         G = nx.Graph()
         for i in range(len(graph_neighbors)):
             G.add_node(i)
@@ -101,6 +96,11 @@ class WeaveNN:
             weights = graph_weights[i]
             for index in range(len(neighbors)):
                 j = neighbors[index]
+                pair = (i, j) if i < j else (j, i)
+                if pair in visited:
+                    continue
+                visited.add(pair)
+
                 G.add_edge(i, j, weight=weights[index])
         return G
 
@@ -140,7 +140,6 @@ def predict_knnl(X, k=100):
 
 def score(y, y_pred):
     from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score
-
     adj_mutual_info = adjusted_mutual_info_score(y, y_pred)
     adj_rand = adjusted_rand_score(y, y_pred)
     return adj_mutual_info, adj_rand
@@ -158,11 +157,25 @@ def extract_partition(dendrogram, n_nodes, level):
     return partition, Q
 
 
-def relabel(partition, k=None, sigma_count=None, min_sc=None):
+def extract_optimal_partition(X, partitions, n_nodes, scoring):
+    scoring = get_scoring_function(scoring)
+    best_score = -float("inf")
+    best_y = None
+    for level in range(1, len(partitions) + 1):
+        y, Q = extract_partition(partitions, n_nodes, level)
+        try:
+            score = scoring(X, y, Q)
+        except ValueError:
+            score = -float("inf")
+        if score >= best_score:
+            best_y = y.copy()
+            best_score = score
+    return best_y
 
+
+def relabel(partition, sigma_count=None, min_sc=None):
     if min_sc is not None:
         for i, sc in enumerate(sigma_count):
-            sc /= k
             if sc < min_sc:
                 partition[i] = -1
 
@@ -172,7 +185,14 @@ def relabel(partition, k=None, sigma_count=None, min_sc=None):
 
     cm_to_nodes = sorted(cm_to_nodes.items(),
                          key=lambda x: len(x[1]), reverse=True)
-    for i, (_, nodes) in enumerate(cm_to_nodes):
-        for node in nodes:
-            partition[node] = _
+
+    index = 0
+    for cm, nodes in cm_to_nodes:
+        if cm == -1:
+            for node in nodes:
+                partition[node] = -1
+        else:
+            for node in nodes:
+                partition[node] = index
+            index += 1
     return partition

@@ -26,8 +26,7 @@ print(f"mutual_info     = {mutual_info_score:.3f}")
 
 # create model and build graph
 # use larger k_max for larger clusters
-weave = WeaveNN(k=50, method="optimal",
-                score="calinski_harabasz")
+weave = WeaveNN(k=50)
 # get graph from cloud points
 # G = weave.fit_transform(X)
 # get cluster labels from graph
