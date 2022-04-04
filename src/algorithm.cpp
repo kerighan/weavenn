@@ -121,7 +121,7 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     return std::make_tuple(graph_neighbors, graph_weights, sigma_count);
 }
 
-std::pair<std::vector<std::pair<Nodes, float>>, Weights> get_partitions(
+std::tuple<std::vector<std::pair<Nodes, float>>, Weights, GraphNeighbors, GraphWeights> get_partitions(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
@@ -130,8 +130,11 @@ std::pair<std::vector<std::pair<Nodes, float>>, Weights> get_partitions(
 {
     auto [graph_neighbors, graph_weights, sigma_count] = get_graph(
         _labels, _distances, _local_scaling, min_sim);
-    return std::make_pair(
+    GraphNeighbors gn = graph_neighbors;
+    GraphWeights gw = graph_weights;
+    return std::make_tuple(
         generate_dendrogram(
-            graph_neighbors, graph_weights, resolution, prune, full, z_modularity),
-        sigma_count);
+            graph_neighbors, graph_weights,
+            resolution, prune, full, z_modularity),
+        sigma_count, gn, gw);
 }

@@ -12,7 +12,7 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     py::array_t<float> _local_scaling,
     float min_sim);
 
-std::pair<std::vector<std::pair<Nodes, float>>, Weights> get_partitions(
+std::tuple<std::vector<std::pair<Nodes, float>>, Weights, GraphNeighbors, GraphWeights> get_partitions(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,

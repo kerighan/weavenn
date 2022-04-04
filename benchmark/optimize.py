@@ -12,7 +12,7 @@ from datasets import load
 # v     v       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "seeds"
+dataset = "iris"
 X, y = load(dataset)
 
 

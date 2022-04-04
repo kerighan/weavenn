@@ -45,9 +45,11 @@ class WeaveNN:
         if self.method == "auto":
             if dim == 2:
                 method = "optimal"
+        elif self.method == "optimal":
+            method = "optimal"
 
         if method == "louvain":
-            partitions, sigma_count = get_partitions(
+            partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
                 self.prune, False, self.z_modularity)
@@ -63,14 +65,23 @@ class WeaveNN:
             return relabel(
                 y, sigma_count=sigma_count, min_sc=min_sc)
         else:
-            partitions, sigma_count = get_partitions(
+            partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
                 self.prune, True, self.z_modularity)
             self._sigma_count = sigma_count
+            # G = self.graph_from_neighbors(graph_neighbors, graph_weights)
+            # from cdlib import evaluation
+            # from community import best_partition
+            # y_pred = best_partition(G)
+            # ave = evaluation.avg_embeddedness(G, y_pred)
+            # print(ave)
+
+            # return [y_pred[i] for i in range(len(G.nodes))]
 
             y = extract_optimal_partition(
-                X, partitions, n_nodes, self.score)
+                X, partitions, n_nodes, self.score,
+                labels, distances, sigma_count)
 
             if self.min_sc is None:
                 min_sc = None
@@ -88,6 +99,10 @@ class WeaveNN:
         graph_neighbors, graph_weights, _ = get_graph(
             labels, distances, local_scaling, self.min_sim)
         # build networkx graph
+
+        return self.graph_from_neighbors(graph_neighbors, graph_weights)
+
+    def graph_from_neighbors(self, graph_neighbors, graph_weights):
         visited = set()
         G = nx.Graph()
         for i in range(len(graph_neighbors)):
@@ -157,14 +172,15 @@ def extract_partition(dendrogram, n_nodes, level):
     return partition, Q
 
 
-def extract_optimal_partition(X, partitions, n_nodes, scoring):
+def extract_optimal_partition(
+        X, partitions, n_nodes, scoring, labels, distances, sigma_count):
     scoring = get_scoring_function(scoring)
     best_score = -float("inf")
     best_y = None
     for level in range(1, len(partitions) + 1):
         y, Q = extract_partition(partitions, n_nodes, level)
         try:
-            score = scoring(X, y, Q)
+            score = scoring(X, y, Q, labels, distances, sigma_count)
         except ValueError:
             score = -float("inf")
         if score >= best_score:
