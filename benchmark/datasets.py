@@ -14,7 +14,7 @@ from sklearn.preprocessing import LabelEncoder, minmax_scale, robust_scale
 
 classification_datasets = [
     "iris", "wine", "mobile", "glass", "zoo", "seeds", "dates",
-    "raisin", "letters", "phonemes", "20newsgroups", "stellar", "mnist", "fashion"
+    "raisin", "letters", "phonemes", "20newsgroups", "stellar", "mnist", "fashion", "cifar10", "usps"
 ]
 
 
@@ -27,6 +27,10 @@ def load(name):
         X = res.data
         X = robust_scale(X)
         return X, res.target
+    elif name == "usps":
+        return load_usps()
+    elif name == "cifar10":
+        return load_cifar10()
     elif name == "raisin":
         return load_raisin()
     elif name == "mobile":
@@ -108,8 +112,6 @@ def load_phonemes():
     y = le.fit_transform(df.g)
     del df["g"], df["row.names"], df["speaker"]
     X = df.values
-    # X = PCA(n_components=20).fit_transform(X)
-    # X = robust_scale(X)
     return X, y
 
 
@@ -160,7 +162,9 @@ def load_cifar10():
     from keras.datasets import cifar10
     (X, y), _ = cifar10.load_data()
     X = X.astype(float)
-    print(X.shape)
+    X = X.reshape((50000, 32*32*3))
+    X = PCA(n_components=20, random_state=0).fit_transform(X)
+    y = y.flatten()
     return X, y
 
 
@@ -170,7 +174,6 @@ def load_stellar():
     y = le.fit_transform(df["class"])
     del df["class"]
     X = robust_scale(df.values)
-
     return X, y
 
 
@@ -184,6 +187,16 @@ def load_20newsgroups():
     X = pipe.fit_transform(newsgroups_train.data)
     y = newsgroups_train.target
     return X, y
+
+
+def load_usps():
+    import h5py
+    with h5py.File("datasets/usps.h5", 'r') as hf:
+        train = hf.get('train')
+        X_tr = train.get('data')[:]
+        y_tr = train.get('target')[:]
+    X_tr = X_tr.astype(np.float64)
+    return X_tr, y_tr
 
 
 # =============================================================================
@@ -214,4 +227,4 @@ def load_reuters():
 
 
 if __name__ == "__main__":
-    load_raisin()
+    load_cifar10()

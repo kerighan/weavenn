@@ -12,7 +12,7 @@ from datasets import load
 # v     v       v    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "iris"
+dataset = "usps"
 X, y = load(dataset)
 
 
@@ -37,8 +37,8 @@ def optimize_weavenn():
     print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
     print(data["weavenn_AMI"].max())
 
-    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
-    # sheets[dataset] = data
+    sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
+    sheets[dataset] = data
 
 
 def optimize_weavenn_full():
@@ -89,7 +89,6 @@ def optimize_knnl():
 
 def optimize_hdbscan():
     from hdbscan import HDBSCAN
-    sheets = oo.Sheets("1XevPDv28MdeVsgxxi1vUSZV9pRRXl8VevB6ds6L2rLY")
 
     min_cluster_size = [2, 5, 10, 15, 20, 30, 50, 60, 80, 100]
     min_samples = [1, 5, 10, 15, 20, 30, 50, 60, 80, 100]
@@ -103,13 +102,14 @@ def optimize_hdbscan():
                 {"mcs": mcs, "ms": ms, "AMI": score_1, "rand": score_2})
 
     scores = pd.DataFrame(scores)
+
+    sheets = oo.Sheets("1XevPDv28MdeVsgxxi1vUSZV9pRRXl8VevB6ds6L2rLY")
     sheets[dataset] = scores
     print(scores.max(axis=0))
 
 
 def optimize_optics():
     from sklearn.cluster import OPTICS
-    sheets = oo.Sheets("1NN_441RDAIjNnNXbXbiTZH1G6mfXN0rveKmDCnEvd_E")
 
     min_samples = range(2, 30)
     scores = []
@@ -121,6 +121,7 @@ def optimize_optics():
             {"ms": ms, "AMI": score_1, "rand": score_2})
 
     scores = pd.DataFrame(scores)
+    sheets = oo.Sheets("1NN_441RDAIjNnNXbXbiTZH1G6mfXN0rveKmDCnEvd_E")
     sheets[dataset] = scores
     print(scores.max(axis=0))
 
@@ -144,6 +145,7 @@ def optimize_dbscanpp():
         "fashion": (1, 4),
         "letters": (.1, .5),
         "mnist": (200, 1200),
+        "usps": (2.368, 6.8),
     }
 
     min_eps, max_eps = values[dataset]
@@ -160,8 +162,9 @@ def optimize_dbscanpp():
                 score_1, score_2 = score(y, y_pred)
                 scores.append(
                     {"eps": epsilon, "p": p, "AMI": score_1, "rand": score_2})
-                print(score_1)
-            except ValueError:
+                print(epsilon, score_1)
+            except ValueError as e:
+                # print(e)
                 scores.append({"eps": epsilon, "p": p, "AMI": 0, "rand": 0})
 
     scores = pd.DataFrame(scores)
@@ -187,9 +190,10 @@ def optimize_affinity_propagation():
 
 
 if __name__ == "__main__":
-    # optimize_dbscanpp()
-    # optimize_optics()
-    # optimize_affinity_propagation()
-    optimize_weavenn()
     # optimize_knnl()
+    # optimize_weavenn()
+    # optimize_hdbscan()
+    # optimize_optics()
+    optimize_dbscanpp()
+    # optimize_affinity_propagation()
     # optimize_weavenn_full()

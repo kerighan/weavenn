@@ -99,14 +99,13 @@ class WeaveNN:
         graph_neighbors, graph_weights, _ = get_graph(
             labels, distances, local_scaling, self.min_sim)
         # build networkx graph
-
         return self.graph_from_neighbors(graph_neighbors, graph_weights)
 
     def graph_from_neighbors(self, graph_neighbors, graph_weights):
         visited = set()
         G = nx.Graph()
+        G.add_nodes_from(range(len(graph_neighbors)))
         for i in range(len(graph_neighbors)):
-            G.add_node(i)
             neighbors = graph_neighbors[i]
             weights = graph_weights[i]
             for index in range(len(neighbors)):
