@@ -8,7 +8,7 @@ N = 1000
 print(f"N={N}")
 X, _ = make_blobs(n_samples=N, n_features=2, cluster_std=1.5)
 
-clusterer = WeaveNN(k=100, min_sim=.01, min_sc=.9)
+clusterer = WeaveNN(k=100, min_sim=.01, min_sc=.5)
 y = clusterer.fit_predict(X)
 c = y.copy()
 c[c >= 0] = 1

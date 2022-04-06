@@ -20,6 +20,7 @@ class WeaveNN:
         metric="l2",
         min_sim=.01,
         min_sc=None,
+        use_percentile=False,
         z_modularity=False,
         verbose=False
     ):
@@ -29,9 +30,25 @@ class WeaveNN:
         self.prune = prune
         self.min_sim = min_sim
         self.min_sc = min_sc
+        self.use_percentile = use_percentile
         self.verbose = verbose
         self.score = score
         self.z_modularity = z_modularity
+
+    def infer_method(self, dim):
+        method = "louvain"
+        if self.method == "auto":
+            if dim == 2:
+                method = "score"
+        elif self.method == "score":
+            method = "score"
+        return method
+
+    def infer_min_sc(self, sigma_count):
+        min_sc = self.min_sc
+        if self.use_percentile:
+            min_sc = np.percentile(sigma_count, int(round(min_sc * 100)))
+        return min_sc
 
     def fit_predict(self, X, resolution=1.):
         labels, distances = self._get_nns(X, min(len(X), self.k))
@@ -40,13 +57,7 @@ class WeaveNN:
 
         n_nodes, dim = X.shape
         local_scaling = np.array(distances[:, -1])
-
-        method = "louvain"
-        if self.method == "auto":
-            if dim == 2:
-                method = "optimal"
-        elif self.method == "optimal":
-            method = "optimal"
+        method = self.infer_method(dim)
 
         if method == "louvain":
             partitions, sigma_count, _, _ = get_partitions(
@@ -56,40 +67,22 @@ class WeaveNN:
             self._sigma_count = sigma_count
 
             y, _ = extract_partition(partitions, n_nodes, 1)
-
-            if self.min_sc is None:
-                min_sc = None
-            else:
-                min_sc = np.percentile(
-                    sigma_count, int(round(self.min_sc * 100)))
-            return relabel(
-                y, sigma_count=sigma_count, min_sc=min_sc)
-        else:
+        elif method == "score":
             partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
                 self.prune, True, self.z_modularity)
             self._sigma_count = sigma_count
-            # G = self.graph_from_neighbors(graph_neighbors, graph_weights)
-            # from cdlib import evaluation
-            # from community import best_partition
-            # y_pred = best_partition(G)
-            # ave = evaluation.avg_embeddedness(G, y_pred)
-            # print(ave)
 
-            # return [y_pred[i] for i in range(len(G.nodes))]
-
-            y = extract_optimal_partition(
+            y = extract_partition_from_score(
                 X, partitions, n_nodes, self.score,
                 labels, distances, sigma_count)
 
-            if self.min_sc is None:
-                min_sc = None
-            else:
-                min_sc = np.percentile(
-                    sigma_count, int(round(self.min_sc * 100)))
-            return relabel(
-                y, sigma_count=sigma_count, min_sc=min_sc)
+        # compute minimum relative sigma count
+        min_sc = self.infer_min_sc(self._sigma_count)
+
+        # order communities and infer outliers
+        return relabel(y, sigma_count=sigma_count, min_sc=min_sc)
 
     def fit_transform(self, X):
         import networkx as nx
@@ -114,42 +107,13 @@ class WeaveNN:
                 if pair in visited:
                     continue
                 visited.add(pair)
-
                 G.add_edge(i, j, weight=weights[index])
         return G
 
 
 # =============================================================================
-# Baseline model
+# Utilities functions
 # =============================================================================
-
-
-def predict_knnl(X, k=100):
-    from cylouvain import best_partition
-
-    ann = get_ann_algorithm("hnswlib", "l2")
-    labels, _ = ann(X, k)
-
-    n_nodes = X.shape[0]
-    visited = set()
-    edges = []
-    for i, row in enumerate(labels):
-        for j in row:
-            if i == j:
-                continue
-            pair = (i, j) if i < j else (j, i)
-            if pair in visited:
-                continue
-            visited.add(pair)
-            edges.append((i, j))
-    G = nx.Graph()
-    G.add_nodes_from(range(n_nodes))
-    G.add_edges_from(edges)
-    partition = best_partition(G)
-    y = np.zeros(n_nodes, dtype=int)
-    for i, val in partition.items():
-        y[i] = val
-    return y
 
 
 def score(y, y_pred):
@@ -171,7 +135,7 @@ def extract_partition(dendrogram, n_nodes, level):
     return partition, Q
 
 
-def extract_optimal_partition(
+def extract_partition_from_score(
         X, partitions, n_nodes, scoring, labels, distances, sigma_count):
     scoring = get_scoring_function(scoring)
     best_score = -float("inf")
@@ -211,3 +175,36 @@ def relabel(partition, sigma_count=None, min_sc=None):
                 partition[node] = index
             index += 1
     return partition
+
+
+# =============================================================================
+# Baseline model
+# =============================================================================
+
+
+def predict_knnl(X, k=100):
+    from cylouvain import best_partition
+
+    ann = get_ann_algorithm("hnswlib", "l2")
+    labels, _ = ann(X, k)
+
+    n_nodes = X.shape[0]
+    visited = set()
+    edges = []
+    for i, row in enumerate(labels):
+        for j in row:
+            if i == j:
+                continue
+            pair = (i, j) if i < j else (j, i)
+            if pair in visited:
+                continue
+            visited.add(pair)
+            edges.append((i, j))
+    G = nx.Graph()
+    G.add_nodes_from(range(n_nodes))
+    G.add_edges_from(edges)
+    partition = best_partition(G)
+    y = np.zeros(n_nodes, dtype=int)
+    for i, val in partition.items():
+        y[i] = val
+    return y
