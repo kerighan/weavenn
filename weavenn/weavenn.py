@@ -82,7 +82,7 @@ class WeaveNN:
         min_sc = self.infer_min_sc(self._sigma_count)
 
         # order communities and infer outliers
-        return relabel(y, sigma_count=sigma_count, min_sc=min_sc)
+        return relabel(X, y, sigma_count=sigma_count, min_sc=min_sc)
 
     def fit_transform(self, X):
         import networkx as nx
@@ -152,7 +152,25 @@ def extract_partition_from_score(
     return best_y
 
 
-def relabel(partition, sigma_count=None, min_sc=None):
+def relabel(
+    X, partition, sigma_count=None, min_sc=None, group_duplicates=True, tol=4
+):
+    if group_duplicates:
+        # assign same labels for same embedding
+        X_round = X.round(decimals=tol)
+        unq, count = np.unique(X_round, axis=0, return_counts=True)
+        repeated_groups = unq[count > 1]
+        for group in repeated_groups:
+            idx = np.argwhere(np.all(X_round == group, axis=1)).ravel()
+            # find first non-negative community
+            for i in idx:
+                cm = partition[i]
+                if cm != -1:
+                    break
+            # set partition to all items
+            for i in idx:
+                partition[i] = cm
+
     if min_sc is not None:
         for i, sc in enumerate(sigma_count):
             if sc < min_sc:
