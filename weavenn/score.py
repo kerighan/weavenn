@@ -36,6 +36,17 @@ def get_scoring_function(score):
 
         def scoring(X, y, _, labels, distances, sigma_count):
             return calinski_harabasz_score(X, y)
+    elif score == "combine":
+        from sklearn.metrics import (calinski_harabasz_score,
+                                     davies_bouldin_score)
+
+        def scoring(X, y, Q, labels, distances, sigma_count):
+            # return 2/(1/(calinski_harabasz_score(X, y)+1e-6) + 1/(Q+1e-6))
+            a = max(calinski_harabasz_score(X, y), 1e-6)
+            b = max(-davies_bouldin_score(X, y), 1e-6)
+            Q = max(Q, 1e-6)
+            return 3/(1/a + 1/b + 1/Q)
+
     elif score == "isolation":
         import numpy as np
 
@@ -51,36 +62,18 @@ def get_scoring_function(score):
             neighbors_weights = sigma_count[labels]
             n, k = X.shape
 
-            H = 0
             for val, row, weights, dists in zip(
                     y, neighbors_com, neighbors_weights, distances):
 
                 same_com = row == val
-
-                H += entropy(row)
-
                 max_value = weights.sum()
                 res = np.sum(weights * same_com) / max_value
-
                 agreement += res
             agreement /= n
-            H /= n
-            # harmonic = (10) / (1/Q + 9/agreement)
-            # print(agreement, variance, Q)
-            agreement = -H
-            print(agreement)
-            # print(agreement, variance, Q, n_coms)
-            # agreement = agreement * math.log(1 + Q)
-            # agreement = 100 * agreement + Q
-            # print(agreement)
-            # agreement *= Q
-            # if agreement == 1:
-            #     agreement = .97
-            # agreement *= math.log(1 + n_coms)
-            # print(agreement)
-            # raise KeyError
-            # agreement = agreement / variance
-            return agreement
+            agreement = max(agreement, 1e-6)
+            Q = max(Q, 1e-6)
+            # print(agreement, Q, n_coms)
+            return Q + agreement
 
             # for i, neighbors in enumerate(labels):
             #     neighbors_com = y[]

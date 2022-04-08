@@ -51,11 +51,26 @@ class WeaveNN:
         return min_sc
 
     def fit_predict(self, X, resolution=1.):
+        import matplotlib.pyplot as plt
+
         labels, distances = self._get_nns(X, min(len(X), self.k))
         if self.verbose:
             print("[*] Computed nearest neighbors")
 
-        n_nodes, dim = X.shape
+        avg_dist = distances.mean(axis=0)
+        avg_dist /= avg_dist.max()
+        I = avg_dist.sum()
+        dim = I / (self.k - I)
+        print(f"dim={dim}")
+        # resolution = dim
+        # dim /= 10
+        dim = dim
+
+        # plt.scatter(range(self.k), avg_dist)
+        # plt.scatter(range(self.k), avg_dist**dim)
+        # plt.show()
+
+        n_nodes, _ = X.shape
         local_scaling = np.array(distances[:, -1])
         method = self.infer_method(dim)
 
@@ -63,15 +78,16 @@ class WeaveNN:
             partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
-                self.prune, False, self.z_modularity)
+                self.prune, False, self.z_modularity, dim)
             self._sigma_count = sigma_count
 
-            y, _ = extract_partition(partitions, n_nodes, 1)
+            y, Q = extract_partition(partitions, n_nodes, 1)
+            print(Q)
         elif method == "score":
             partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
-                self.prune, True, self.z_modularity)
+                self.prune, True, self.z_modularity, dim)
             self._sigma_count = sigma_count
 
             y = extract_partition_from_score(
@@ -87,10 +103,16 @@ class WeaveNN:
     def fit_transform(self, X):
         import networkx as nx
         labels, distances = self._get_nns(X, min(len(X), self.k))
+
+        avg_dist = distances.mean(axis=0)
+        avg_dist /= avg_dist.max()
+        I = avg_dist.sum()
+        dim = I / (self.k - I)
+
         local_scaling = np.array(distances[:, -1])
         # get adjacency list
         graph_neighbors, graph_weights, _ = get_graph(
-            labels, distances, local_scaling, self.min_sim)
+            labels, distances, local_scaling, self.min_sim, dim)
         # build networkx graph
         return self.graph_from_neighbors(graph_neighbors, graph_weights)
 

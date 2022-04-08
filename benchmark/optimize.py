@@ -9,10 +9,10 @@ from weavenn.weavenn import WeaveNN, predict_knnl, score
 from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, dates, raisin, phonemes
-# v     v       v    v     v      v      v      x       v
+# v     v       x    v     v      x      x      v       v
 # stellar, 20newsgroups, fashion, letters, mnist
 # v        v             v        v        v
-dataset = "usps"
+dataset = "mobile"
 X, y = load(dataset)
 
 
@@ -23,7 +23,7 @@ def optimize_weavenn():
     for k in tqdm(ks):
         tmp = {"k": k}
 
-        y_pred = WeaveNN(k=k).fit_predict(X)
+        y_pred = WeaveNN(k=k).fit_predict(X, resolution=1)
         score_1, score_2 = score(y, y_pred)
         tmp["weavenn_AMI"] = score_1
         tmp["weavenn_RAND"] = score_2
@@ -37,8 +37,37 @@ def optimize_weavenn():
     print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
     print(data["weavenn_AMI"].max())
 
-    sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
-    sheets[dataset] = data
+    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
+    # sheets[dataset] = data
+
+
+def optimize_weavenn_lpa():
+    from nodl.community import label_propagation
+    ks = range(20, 160, 10)
+    data = []
+    start = time.time()
+    for k in tqdm(ks):
+        tmp = {"k": k}
+
+        G = WeaveNN(k=k).fit_transform(X)
+        y_pred = label_propagation(G)
+        y_pred = [y_pred[i] for i in range(len(G.nodes))]
+        # y_pred = WeaveNN(k=k).fit_predict(X)
+        score_1, score_2 = score(y, y_pred)
+        tmp["weavenn_AMI"] = score_1
+        tmp["weavenn_RAND"] = score_2
+        print(tmp)
+
+        data.append(tmp)
+    print(time.time() - start)
+    data = pd.DataFrame(data)[
+        ["k", "weavenn_AMI", "weavenn_RAND"]]
+
+    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
+    print(data["weavenn_AMI"].max())
+
+    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
+    # sheets[dataset] = data
 
 
 def optimize_weavenn_full():
@@ -191,9 +220,10 @@ def optimize_affinity_propagation():
 
 if __name__ == "__main__":
     # optimize_knnl()
-    # optimize_weavenn()
+    optimize_weavenn()
     # optimize_hdbscan()
     # optimize_optics()
-    optimize_dbscanpp()
+    # optimize_dbscanpp()
+    # optimize_weavenn_lpa()
     # optimize_affinity_propagation()
     # optimize_weavenn_full()

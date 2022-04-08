@@ -23,7 +23,7 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
-    float min_sim)
+    float min_sim, float dim)
 {
     // get data buffers
     py::buffer_info labelsBuf = _labels.request();
@@ -50,25 +50,26 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     float scale = acosh(k / log2(k));
 
     // compute average convexity
-    float convexity = 0;
-    for (uint64_t i = 0; i < n_nodes; i++)
-    {
-        float sigma_i = local_scaling[i];
-        float conv = 0;
-        for (size_t index = 0; index < k; index++)
-        {
-            float dist = distances[i * k + index];
-            conv += index * sigma_i / (k - 1) - dist;
-        }
+    // float convexity = 0;
+    // for (uint64_t i = 0; i < n_nodes; i++)
+    // {
+    //     float sigma_i = local_scaling[i];
+    //     float conv = 0;
+    //     for (size_t index = 0; index < k; index++)
+    //     {
+    //         float dist = distances[i * k + index];
+    //         conv += index * sigma_i / (k - 1) - dist;
+    //     }
 
-        if (sigma_i == 0) // case where nns distances are flat
-            conv = 0.5;
-        else
-            conv /= ((k - 1) * sigma_i) / 2;
-        convexity += conv;
-    }
-    convexity /= n_nodes;
-    float curvature = (1 + convexity) / (1 - convexity);
+    //     if (sigma_i == 0) // case where nns distances are flat
+    //         conv = 0.5;
+    //     else
+    //         conv /= ((k - 1) * sigma_i) / 2;
+    //     convexity += conv;
+    // }
+    // convexity /= n_nodes;
+    // float curvature = 1 / ((1 + convexity) / (1 - convexity));
+    // std::cout << curvature << " " << convexity << std::endl;
 
     for (uint64_t i = 0; i < n_nodes; i++)
     {
@@ -103,7 +104,7 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
             }
             else
             {
-                dist = pow(dist * dist / (sigma_i * sigma_j), curvature);
+                dist = pow(dist * dist / (sigma_i * sigma_j), dim);
                 weight = 1 / cosh(dist * scale);
             }
 
@@ -126,10 +127,10 @@ std::tuple<std::vector<std::pair<Nodes, float>>, Weights, GraphNeighbors, GraphW
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
     float min_sim, float resolution,
-    bool prune, bool full, bool z_modularity)
+    bool prune, bool full, bool z_modularity, float dim)
 {
     auto [graph_neighbors, graph_weights, sigma_count] = get_graph(
-        _labels, _distances, _local_scaling, min_sim);
+        _labels, _distances, _local_scaling, min_sim, dim);
     GraphNeighbors gn = graph_neighbors;
     GraphWeights gw = graph_weights;
     return std::make_tuple(
