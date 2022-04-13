@@ -9,10 +9,10 @@ from weavenn.weavenn import WeaveNN, predict_knnl, score
 from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, dates, raisin, phonemes
-# v     v       x    v     v      x      x      v       v
-# stellar, 20newsgroups, fashion, letters, mnist
-# v        v             v        v        v
-dataset = "mobile"
+# v     v       x    x     v      v      v      v       v
+# stellar, 20newsgroups, fashion, letters, mnist, usps
+# v        v             v        v        v      v
+dataset = "usps"
 X, y = load(dataset)
 
 

@@ -47,7 +47,10 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     graph_weights.resize(n_nodes);
     sigma_count.resize(n_nodes);
 
-    float scale = acosh(k / log2(k));
+    // float scale = acosh(k / log2(k));
+    // float scale = atanh(1 - 1 / log2(k));
+    float scale = 2;
+    std::cout << scale << std::endl;
 
     // compute average convexity
     // float convexity = 0;
@@ -104,8 +107,11 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
             }
             else
             {
-                dist = pow(dist * dist / (sigma_i * sigma_j), dim);
-                weight = 1 / cosh(dist * scale);
+                dist = pow((dist * dist) / (sigma_i * sigma_j), dim);
+                // weight = 1 / cosh(dist * scale);
+                // weight = 1 - tanh(pow(dist, 2) * scale);
+                // weight = sqrt((2 * dist) / (2 * dist + 2));
+                weight = exp(-pow(dist, 2));
             }
 
             if (weight < min_sim)
