@@ -19,8 +19,7 @@ float modularity(
     Weights const &internals,
     Weights const &degrees,
     float total_weight,
-    float resolution,
-    bool z_modularity);
+    float resolution);
 
 WeightMap neighcom(
     GraphNeighbors const &graph_neighbors,
@@ -37,8 +36,7 @@ void one_level(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution,
-    bool z_modularity);
+    float resolution);
 
 void one_level_prune(
     GraphNeighbors const &graph_neighbors,
@@ -49,8 +47,7 @@ void one_level_prune(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution,
-    bool z_modularity);
+    float resolution);
 
 void one_step(
     GraphNeighbors const &graph_neighbors,
@@ -61,8 +58,7 @@ void one_step(
     Weights &degrees,
     Weights const &gdegrees,
     float total_weight,
-    float resolution,
-    bool z_modularity);
+    float resolution);
 
 std::tuple<GraphNeighbors, Nodes> renumber(
     GraphNeighbors const &graph_neighbors,
@@ -82,5 +78,4 @@ std::vector<std::pair<Nodes, float>> generate_dendrogram(
     GraphWeights &graph_weights,
     float resolution,
     bool prune,
-    bool full,
-    bool z_modularity);
+    bool full);

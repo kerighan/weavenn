@@ -9,96 +9,41 @@ from weavenn.weavenn import WeaveNN, predict_knnl, score
 from datasets import load
 
 # iris, mobile, zoo, wine, glass, seeds, dates, raisin, phonemes
-# v     v       x    x     v      v      v      v       v
+# v     v       x    v     v      v      v      x       v
 # stellar, 20newsgroups, fashion, letters, mnist, usps
-# v        v             v        v        v      v
-dataset = "usps"
+# ~        v             v        ~        ~      v
+dataset = "mnist"
 X, y = load(dataset)
 
 
 def optimize_weavenn():
-    ks = range(20, 160, 10)
+    print(dataset)
+    ks = range(10, 160, 10)
     data = []
-    start = time.time()
     for k in tqdm(ks):
         tmp = {"k": k}
 
-        y_pred = WeaveNN(k=k).fit_predict(X, resolution=1)
+        y_pred = WeaveNN(k=k, method="mch",
+                         reduce_dim=3, min_sim=0.25).fit_predict(X)
         score_1, score_2 = score(y, y_pred)
         tmp["weavenn_AMI"] = score_1
         tmp["weavenn_RAND"] = score_2
         print(tmp)
 
         data.append(tmp)
-    print(time.time() - start)
     data = pd.DataFrame(data)[
         ["k", "weavenn_AMI", "weavenn_RAND"]]
 
     print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
     print(data["weavenn_AMI"].max())
 
-    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
-    # sheets[dataset] = data
-
-
-def optimize_weavenn_lpa():
-    from nodl.community import label_propagation
-    ks = range(20, 160, 10)
-    data = []
-    start = time.time()
-    for k in tqdm(ks):
-        tmp = {"k": k}
-
-        G = WeaveNN(k=k).fit_transform(X)
-        y_pred = label_propagation(G)
-        y_pred = [y_pred[i] for i in range(len(G.nodes))]
-        # y_pred = WeaveNN(k=k).fit_predict(X)
-        score_1, score_2 = score(y, y_pred)
-        tmp["weavenn_AMI"] = score_1
-        tmp["weavenn_RAND"] = score_2
-        print(tmp)
-
-        data.append(tmp)
-    print(time.time() - start)
-    data = pd.DataFrame(data)[
-        ["k", "weavenn_AMI", "weavenn_RAND"]]
-
-    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
-    print(data["weavenn_AMI"].max())
-
-    # sheets = oo.Sheets("1_Aqv7TP6WxfL3WXP17H_PF-fa8FR-DMycrIATjXRxlo")
-    # sheets[dataset] = data
-
-
-def optimize_weavenn_full():
-    ks = range(20, 160, 10)
-    data = []
-    start = time.time()
-    for k in tqdm(ks):
-        for min_sim in [.0001, .001, .01, .1, .25, .5, .8]:
-            tmp = {"k": k, "min_sim": min_sim}
-
-            y_pred = WeaveNN(k=k, min_sim=min_sim, prune=False).fit_predict(X)
-            score_1, score_2 = score(y, y_pred)
-            tmp["weavenn_AMI"] = score_1
-            tmp["weavenn_RAND"] = score_2
-            print(tmp)
-
-            data.append(tmp)
-    print(time.time() - start)
-    data = pd.DataFrame(data)[
-        ["k", "min_sim", "weavenn_AMI", "weavenn_RAND"]]
-
-    print(data["weavenn_AMI"].mean(), data["weavenn_AMI"].std())
-    print(data["weavenn_AMI"].max())
-
-    sheets = oo.Sheets("1jYHWTxRoahdrT06ofOoqmUMLgnRxy0OxppsFAoB_e60")
+    sheets = oo.Sheets("1iOP37X_Ex8KJWDmHhsRdXFg1JRAhiEo8eqcYO2FfzTE")
     sheets[dataset] = data
 
 
 def optimize_knnl():
     sheets = oo.Sheets("1lY3ekInWwIO3KNWgab9Y7QhzswcJE1iGV0n1j3oQuag")
-    ks = range(20, 160, 10)
+    ks = range(10, 160, 10)
     data = []
     start = time.time()
     for k in tqdm(ks):
@@ -224,6 +169,4 @@ if __name__ == "__main__":
     # optimize_hdbscan()
     # optimize_optics()
     # optimize_dbscanpp()
-    # optimize_weavenn_lpa()
     # optimize_affinity_propagation()
-    # optimize_weavenn_full()

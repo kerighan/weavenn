@@ -14,14 +14,14 @@ class WeaveNN:
         self,
         k=50,
         ann_algorithm="hnswlib",
-        method="auto",
-        score="calinski_harabasz",
+        method="mch",
         prune=False,
         metric="l2",
-        min_sim=.01,
+        min_sim=.25,
         min_sc=None,
+        reduce_dim=3,
+        max_clusters=None,
         use_percentile=False,
-        z_modularity=False,
         verbose=False
     ):
         self.k = k
@@ -29,20 +29,11 @@ class WeaveNN:
         self.method = method
         self.prune = prune
         self.min_sim = min_sim
-        self.min_sc = min_sc
+        self.min_sc = min_sc if min_sc else 0
         self.use_percentile = use_percentile
         self.verbose = verbose
-        self.score = score
-        self.z_modularity = z_modularity
-
-    def infer_method(self, dim):
-        method = "louvain"
-        if self.method == "auto":
-            if dim == 2:
-                method = "score"
-        elif self.method == "score":
-            method = "score"
-        return method
+        self.max_clusters = max_clusters
+        self.reduce_dim = reduce_dim
 
     def infer_min_sc(self, sigma_count):
         min_sc = self.min_sc
@@ -61,44 +52,37 @@ class WeaveNN:
         avg_dist /= avg_dist.max()
         I = avg_dist.sum()
         dim = I / (self.k - I)
-        print(f"dim={dim}")
-        # resolution = dim
-        # dim /= 10
-        dim = dim
-
-        # plt.scatter(range(self.k), avg_dist)
-        # plt.scatter(range(self.k), avg_dist**dim)
+        # print(f"dim={dim}")
+        beta = dim / self.reduce_dim
+        # plt.plot(range(self.k), avg_dist)
+        # plt.plot(range(self.k), avg_dist**beta)
         # plt.show()
 
         n_nodes, _ = X.shape
         local_scaling = np.array(distances[:, -1])
-        method = self.infer_method(dim)
 
-        if method == "louvain":
+        if self.method == "louvain":
             partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
-                self.prune, False, self.z_modularity, dim)
+                self.prune, False, beta, dim, self.min_sc, self.k)
             self._sigma_count = sigma_count
 
-            y, Q = extract_partition(partitions, n_nodes, 1)
-            print(Q)
-        elif method == "score":
+            y, _ = extract_partition(partitions, n_nodes, 1)
+        else:
             partitions, sigma_count, _, _ = get_partitions(
                 labels, distances, local_scaling,
                 self.min_sim, resolution,
-                self.prune, True, self.z_modularity, dim)
+                self.prune, True, beta, dim, self.min_sc, self.k)
             self._sigma_count = sigma_count
 
             y = extract_partition_from_score(
-                X, partitions, n_nodes, self.score,
-                labels, distances, sigma_count)
-
-        # compute minimum relative sigma count
-        min_sc = self.infer_min_sc(self._sigma_count)
+                X, partitions, n_nodes, self.method,
+                labels, distances, sigma_count,
+                max_clusters=self.max_clusters)
 
         # order communities and infer outliers
-        return relabel(X, y, sigma_count=sigma_count, min_sc=min_sc)
+        return relabel(X, y)
 
     def fit_transform(self, X):
         import networkx as nx
@@ -108,13 +92,28 @@ class WeaveNN:
         avg_dist /= avg_dist.max()
         I = avg_dist.sum()
         dim = I / (self.k - I)
+        beta = dim / self.reduce_dim
 
         local_scaling = np.array(distances[:, -1])
         # get adjacency list
-        graph_neighbors, graph_weights, _ = get_graph(
-            labels, distances, local_scaling, self.min_sim, dim)
+        graph_neighbors, graph_weights, sigma_count = get_graph(
+            labels, distances, local_scaling, self.min_sim, beta, dim)
+        self._sigma_count = sigma_count
         # build networkx graph
         return self.graph_from_neighbors(graph_neighbors, graph_weights)
+
+    def fit_reduce(
+        self, D, n_components=2, walk_len=50, n_walks=25, corruption=.66,
+        batch_size=400, epochs=10, b=None, init="spectral"
+    ):
+        from .reduce import reduce
+        if isinstance(D, np.ndarray):
+            G = self.fit_transform(D)
+            return reduce(G, n_components, walk_len=walk_len, n_walks=n_walks,
+                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init)
+        else:
+            return reduce(D, n_components, walk_len=walk_len, n_walks=n_walks,
+                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init)
 
     def graph_from_neighbors(self, graph_neighbors, graph_weights):
         visited = set()
@@ -158,16 +157,19 @@ def extract_partition(dendrogram, n_nodes, level):
 
 
 def extract_partition_from_score(
-        X, partitions, n_nodes, scoring, labels, distances, sigma_count):
+        X, partitions, n_nodes, scoring,
+        labels, distances, sigma_count, max_clusters=None):
     scoring = get_scoring_function(scoring)
     best_score = -float("inf")
     best_y = None
     for level in range(1, len(partitions) + 1):
         y, Q = extract_partition(partitions, n_nodes, level)
-        try:
-            score = scoring(X, y, Q, labels, distances, sigma_count)
-        except ValueError:
-            score = -float("inf")
+        score = scoring(X, y, Q, labels, distances, sigma_count)
+        if max_clusters is not None:
+            n_clusters = np.unique(y).shape[0]
+            if n_clusters > max_clusters:
+                score *= 1e-3
+
         if score >= best_score:
             best_y = y.copy()
             best_score = score
@@ -175,7 +177,7 @@ def extract_partition_from_score(
 
 
 def relabel(
-    X, partition, sigma_count=None, min_sc=None, group_duplicates=True, tol=4
+    X, partition, group_duplicates=True, tol=4
 ):
     if group_duplicates:
         # assign same labels for same embedding
@@ -193,11 +195,6 @@ def relabel(
             for i in idx:
                 partition[i] = cm
 
-    if min_sc is not None:
-        for i, sc in enumerate(sigma_count):
-            if sc < min_sc:
-                partition[i] = -1
-
     cm_to_nodes = {}
     for node, com in enumerate(partition):
         cm_to_nodes.setdefault(com, []).append(node)
@@ -211,9 +208,12 @@ def relabel(
             for node in nodes:
                 partition[node] = -1
         else:
-            for node in nodes:
-                partition[node] = index
-            index += 1
+            if len(nodes) == 1:
+                partition[nodes[0]] = -1
+            else:
+                for node in nodes:
+                    partition[node] = index
+                index += 1
     return partition
 
 
@@ -248,3 +248,54 @@ def predict_knnl(X, k=100):
     for i, val in partition.items():
         y[i] = val
     return y
+
+
+def lpa(G, sc):
+    from collections import Counter
+    from random import choice
+    n_nodes = len(G.nodes)
+    # sc = np.sort(sc)
+    sc = np.array(sc)
+    nodes = np.argsort(sc)
+    # nodes = nodes[::-1]
+
+    cm = np.arange(n_nodes)
+
+    # one pass
+    n_changes = -1
+    while n_changes != 0:
+        n_changes = 0
+        np.random.shuffle(nodes)
+        for node in nodes:
+            current_cm = cm[node]
+            node_sc = sc[node]
+
+            count = Counter()
+
+            nbs = set(G.neighbors(node))
+            for neighbor in nbs:
+                if sc[neighbor] >= node_sc:
+                    continue
+
+                target = set(G.neighbors(neighbor))
+                common_neighbors = len(nbs.intersection(target))
+
+                nb_cm = cm[neighbor]
+                count[nb_cm] += sc[neighbor] * common_neighbors
+
+            if len(count) == 0:
+                continue
+
+            _, max_count = count.most_common()[0]
+            candidates = []
+            for candidate_cm, c in count.most_common():
+                if c < max_count:
+                    break
+                candidates.append(candidate_cm)
+            new_cm = choice(candidates)
+            if new_cm == current_cm:
+                continue
+
+            n_changes += 1
+            cm[node] = new_cm
+    return cm

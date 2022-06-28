@@ -8,6 +8,8 @@
 
 namespace py = pybind11;
 
+float MIN_VALUE = 0.0001;
+
 struct hash_pair
 {
     template <class T1, class T2>
@@ -19,11 +21,44 @@ struct hash_pair
     }
 };
 
+std::tuple<GraphNeighbors, GraphWeights, Weights> filter_edges(
+    GraphNeighbors const &graph_neighbors,
+    GraphWeights const &graph_weights,
+    Weights const &sigma_count,
+    float min_sc, float k)
+{
+
+    size_t n_nodes = graph_neighbors.size();
+    GraphNeighbors gn;
+    GraphWeights gw;
+    Weights sc;
+    gn.resize(n_nodes);
+    gw.resize(n_nodes);
+    sc.resize(n_nodes);
+    for (Node i = 0; i < n_nodes; i++)
+    {
+        if (sigma_count[i] < min_sc)
+            continue;
+
+        for (size_t index = 0; index < graph_neighbors[i].size(); index++)
+        {
+            Node j = graph_neighbors[i][index];
+            if (sigma_count[j] < min_sc)
+                continue;
+            Weight w = graph_weights[i][index];
+            gn[i].push_back(j);
+            gw[i].push_back(w);
+            sc[i] += w / k;
+        }
+    }
+    return std::make_tuple(gn, gw, sc);
+}
+
 std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     py::array_t<uint64_t> _labels,
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
-    float min_sim, float dim)
+    float min_sim, float beta, float dim)
 {
     // get data buffers
     py::buffer_info labelsBuf = _labels.request();
@@ -47,44 +82,21 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     graph_weights.resize(n_nodes);
     sigma_count.resize(n_nodes);
 
-    // float scale = acosh(k / log2(k));
-    // float scale = atanh(1 - 1 / log2(k));
-    float scale = 2;
-    std::cout << scale << std::endl;
-
-    // compute average convexity
-    // float convexity = 0;
-    // for (uint64_t i = 0; i < n_nodes; i++)
-    // {
-    //     float sigma_i = local_scaling[i];
-    //     float conv = 0;
-    //     for (size_t index = 0; index < k; index++)
-    //     {
-    //         float dist = distances[i * k + index];
-    //         conv += index * sigma_i / (k - 1) - dist;
-    //     }
-
-    //     if (sigma_i == 0) // case where nns distances are flat
-    //         conv = 0.5;
-    //     else
-    //         conv /= ((k - 1) * sigma_i) / 2;
-    //     convexity += conv;
-    // }
-    // convexity /= n_nodes;
-    // float curvature = 1 / ((1 + convexity) / (1 - convexity));
-    // std::cout << curvature << " " << convexity << std::endl;
+    float scale = atanh(1 - log2(k) / k);
+    // float scale = 1;
+    // float scale = atanh(1. - pow(1. / k, 1. / dim));
 
     for (uint64_t i = 0; i < n_nodes; i++)
     {
-        float sigma_i = local_scaling[i];
-        if (sigma_i < 0.000001)
-            sigma_i = 0.000001;
+        float sigma_i = std::max(local_scaling[i], MIN_VALUE);
 
         for (size_t index = 0; index < k; index++)
         {
             uint64_t j = labels[i * k + index];
             if (i == j)
                 continue;
+
+            // add pair to visited edges
             std::pair<uint64_t, uint64_t> pair;
             if (i < j)
                 pair = std::make_pair(i, j);
@@ -94,24 +106,16 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
                 continue;
             visited.insert(pair);
 
-            float sigma_j = local_scaling[j];
-            if (sigma_j < 0.000001)
-                sigma_j = 0.000001;
+            float sigma_j = std::max(local_scaling[j], MIN_VALUE);
 
             float dist = distances[i * k + index];
-
             float weight;
             if (dist == 0)
-            {
                 weight = 1;
-            }
             else
             {
-                dist = pow((dist * dist) / (sigma_i * sigma_j), dim);
-                // weight = 1 / cosh(dist * scale);
-                // weight = 1 - tanh(pow(dist, 2) * scale);
-                // weight = sqrt((2 * dist) / (2 * dist + 2));
-                weight = exp(-pow(dist, 2));
+                dist = pow((dist * dist) / (sigma_i * sigma_j), beta);
+                weight = 1. - tanh(dist * scale);
             }
 
             if (weight < min_sim)
@@ -133,15 +137,24 @@ std::tuple<std::vector<std::pair<Nodes, float>>, Weights, GraphNeighbors, GraphW
     py::array_t<float> _distances,
     py::array_t<float> _local_scaling,
     float min_sim, float resolution,
-    bool prune, bool full, bool z_modularity, float dim)
+    bool prune, bool full, float beta, float dim, float min_sc, size_t k)
 {
     auto [graph_neighbors, graph_weights, sigma_count] = get_graph(
-        _labels, _distances, _local_scaling, min_sim, dim);
+        _labels, _distances, _local_scaling, min_sim, beta, dim);
+    if (min_sc > 0)
+    {
+        auto [gn_, gw_, sc_] = filter_edges(
+            graph_neighbors, graph_weights, sigma_count, min_sc, k);
+        graph_neighbors = gn_;
+        graph_weights = gw_;
+        sigma_count = sc_;
+    }
+
     GraphNeighbors gn = graph_neighbors;
     GraphWeights gw = graph_weights;
     return std::make_tuple(
         generate_dendrogram(
             graph_neighbors, graph_weights,
-            resolution, prune, full, z_modularity),
+            resolution, prune, full),
         sigma_count, gn, gw);
 }
