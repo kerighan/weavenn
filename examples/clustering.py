@@ -9,7 +9,7 @@ X = dataset.data
 y = dataset.target
 
 # create weavenn model
-y_pred = WeaveNN(method="mch").fit_predict(X)
+y_pred = WeaveNN().fit_predict(X)
 
 # compute scores
 homogeneity = homogeneity_score(y, y_pred)

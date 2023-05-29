@@ -1,1 +1,3 @@
-from .weavenn import WeaveNN, predict_knnl, score
+from .weavenn import WeaveNN
+
+__all__ = ["WeaveNN"]

@@ -1,7 +1,7 @@
 from glob import glob
-
 import pybind11
 from setuptools import Extension, find_packages, setup
+
 
 ext_modules = [
     Extension(
@@ -14,18 +14,12 @@ ext_modules = [
         extra_compile_args=["-Ofast", "-std=c++17"])
 ]
 
-
 setup(
     name="weavenn",
-    version="0.0.5",
-    author="Maixent Chenebaux",
-    author_email="max.chbx@gmail.com",
-    description="Density-aware k-nearest neighbor graph from cloud points",
-    url="https://github.com/kerighan/weavenn",
+    version="1.0.0",
     packages=find_packages(),
     include_package_data=True,
-    install_requires=["networkx", "numpy",
-                      "scikit-learn"],
+    install_requires=["networkx", "numpy", "scikit-learn", "numba", "hnswlib"],
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
