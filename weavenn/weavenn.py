@@ -27,6 +27,7 @@ class WeaveNN:
         threshold=.1,
         scale_free_factor=2,
         scale_free_gamma=2.5,
+        ann_method="annoy",
         verbose=False
     ):
         self.k = k
@@ -43,20 +44,45 @@ class WeaveNN:
         # scale free parameters of the graph
         self.scale_free_factor = scale_free_factor
         self.scale_free_gamma = scale_free_gamma
+        self.ann_method = ann_method
         self.verbose = verbose
 
     def get_knns(self, X):
-        import hnswlib
-
         n, dim = X.shape
 
-        index = hnswlib.Index(space=self.metric, dim=dim)
-        index.init_index(
-            max_elements=n, ef_construction=3 * self.k,
-            M=250, random_seed=100)
-        index.add_items(X, range(n))
+        if self.ann_method == "hnsw":
+            import hnswlib
+            index = hnswlib.Index(space=self.metric, dim=dim)
+            index.init_index(
+                max_elements=n, ef_construction=3 * self.k,
+                M=250, random_seed=100)
+            index.add_items(X, range(n))
+            labels, distances = index.knn_query(X, k=self.k)
+        elif self.ann_method == "pynndescent":
+            from pynndescent import NNDescent
+            index = NNDescent(
+                X, metric=self.metric, n_neighbors=self.k,
+                n_jobs=-1, random_state=100)
+            distances, labels = index.query(X, k=self.k)
+        elif self.ann_method == "annoy":
+            from annoy import AnnoyIndex
+            metric = "angular" if self.metric == "cosine" else self.metric
+            metric = "euclidean" if metric == "l2" else metric
 
-        labels, distances = index.knn_query(X, k=self.k)
+            index = AnnoyIndex(dim, metric)
+            for i, x in enumerate(X):
+                index.add_item(i, x)
+            index.build(100)
+            labels = []
+            distances = []
+            for x in X:
+                l, d = index.get_nns_by_vector(
+                    x, self.k,
+                    include_distances=True)
+                labels.append(l)
+                distances.append(d)
+            labels = np.array(labels)
+            distances = np.array(distances)
         return labels, distances
 
     def get_reduced_distances(self):
