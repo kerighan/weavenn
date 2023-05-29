@@ -10,8 +10,6 @@ from weavenn import WeaveNN
 
 # np.
 N = np.random.randint(100, 4000)
-# print(N)
-# N = 3828
 X, y = make_blobs(n_samples=N, centers=4, n_features=2,
                   cluster_std=1, random_state=3)
 print(f"N={N}")

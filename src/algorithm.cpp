@@ -83,8 +83,6 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
     sigma_count.resize(n_nodes);
 
     float scale = atanh(1 - log2(k) / k);
-    // float scale = 1;
-    // float scale = atanh(1. - pow(1. / k, 1. / dim));
 
     for (uint64_t i = 0; i < n_nodes; i++)
     {
@@ -114,8 +112,18 @@ std::tuple<GraphNeighbors, GraphWeights, Weights> get_graph(
                 weight = 1;
             else
             {
-                dist = pow((dist * dist) / (sigma_i * sigma_j), beta);
-                weight = 1. - tanh(dist * scale);
+                // dist = pow((dist * dist) / (sigma_i * sigma_j), beta);
+                // dist = (dist * dist) / (sigma_i * sigma_j);
+                // dist = (dist * dist) / (sigma_i * sigma_j);
+                // dist = pow(dist, .5);
+                // weight = 1. - tanh(dist * scale);
+                float weight_i = 1. - tanh(scale * dist / sigma_i);
+                float weight_j = 1. - tanh(scale * dist / sigma_j);
+                // weight = weight_i + weight_j - weight_i * weight_j;
+                if (weight_i < weight_j)
+                    weight = weight_i;
+                else
+                    weight = weight_j;
             }
 
             if (weight < min_sim)

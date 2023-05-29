@@ -33,7 +33,6 @@ def get_scoring_function(score):
             return silhouette_score(X, y)
     elif score == "calinski_harabasz":
         import numpy as np
-        from sklearn.metrics import calinski_harabasz_score
 
         def scoring(X, y, Q, labels, distances, sigma_count):
             l = np.unique(y)
@@ -67,11 +66,11 @@ def get_scoring_function(score):
                 return -float("inf")
 
             sigma_count = np.array(sigma_count)
+            sigma_count_normalized = sigma_count / sigma_count.sum()
             extra_disp, intra_disp = 0.0, 0.0
 
             # mean = np.mean(X, axis=0)
-            sc = sigma_count / sigma_count.sum()
-            mean = np.sum(X * sc[:, None], axis=0)
+            mean = np.sum(X * sigma_count_normalized[:, None], axis=0)
             for k in labels:
                 cluster_k = X[y == k]
                 if len(cluster_k) == 1:
@@ -90,7 +89,9 @@ def get_scoring_function(score):
                 if intra_disp == 0.0
                 else extra_disp * (n_samples - n_labels) / (intra_disp * (n_labels - 1.0))
             )
-            return value * (Q**2)
+            # return value * Q
+            # print(value * Q)
+            return value * Q
     elif score == "test2":
         import numpy as np
 
@@ -139,7 +140,6 @@ def get_scoring_function(score):
             labels = labels[:, :20]
             distances = distances[:, :20]
 
-            import math
             n_coms = len(set(y))
             if n_coms == 1:  # only one cluster
                 return -float("inf")

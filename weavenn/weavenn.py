@@ -104,16 +104,16 @@ class WeaveNN:
 
     def fit_reduce(
         self, D, n_components=2, walk_len=50, n_walks=25, corruption=.66,
-        batch_size=400, epochs=10, b=None, init="spectral"
+        batch_size=400, epochs=10, b=None, init="spectral", verbose=0
     ):
         from .reduce import reduce
         if isinstance(D, np.ndarray):
             G = self.fit_transform(D)
             return reduce(G, n_components, walk_len=walk_len, n_walks=n_walks,
-                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init)
+                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init, verbose=verbose)
         else:
             return reduce(D, n_components, walk_len=walk_len, n_walks=n_walks,
-                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init)
+                          corruption=corruption, batch_size=batch_size, epochs=epochs, b=b, init=init, verbose=verbose)
 
     def graph_from_neighbors(self, graph_neighbors, graph_weights):
         visited = set()
