@@ -106,6 +106,8 @@ class WeaveNN:
         labels, distances = self.get_knns(X)
         self._labels = labels
         self._distances = distances
+        if self.verbose:
+            logging.info(f"labels.shape={labels.shape}")
 
         # dimensionality fingerprinting
         dim = self.infer_dimensionality(distances)
